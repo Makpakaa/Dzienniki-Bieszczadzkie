@@ -1,6 +1,7 @@
 import random
 import pickle
 import sys
+from plants import plants, Seed
 
 
 # Klasa wyposażenia gracza (Equipment)
@@ -59,9 +60,11 @@ class Player:
         self.luck = 1
         self.experience_points = 0
 
-        # Dodaj początkowe rośliny do ekwipunku gracza
+        # Dodaj początkowe rośliny (nasiona) do ekwipunku gracza
         for seed in plants[:2]:  # Pierwsze dwa nasiona jako startowe
-            self.inventory.add_item(seed)
+            self.inventory.add_item(seed, quantity=3)  # Dodaj po 3 sztuki każdego nasiona
+
+
 
         self.inventory.add_item(Tool("Motyka"))
         self.inventory.add_item(Tool("Konewka", capacity=100))
@@ -77,7 +80,7 @@ class Player:
         if not tool:
             print(f"Nie masz narzędzia: {tool_name}.")
             return
-        if tool_name == "Motyka" and not plot.is_tilled:
+        if tool_name == "Motyka" and plot.state == "empty":
             plot.till()
             print("Pole zostało przygotowane pod zasiew.")
         elif tool_name == "Konewka":
@@ -109,11 +112,24 @@ class Inventory:
         self.items = []
         self.max_capacity = 10
 
-    def add_item(self, item):
+    def add_item(self, item, quantity=1):
         """Dodaje przedmiot do ekwipunku, jeśli jest miejsce"""
+        for existing_item in self.items:
+            # Jeśli przedmiot to Seed i już istnieje w ekwipunku, zwiększ ilość
+            if isinstance(existing_item, type(item)) and hasattr(existing_item,
+                                                                 'seed_id') and existing_item.seed_id == getattr(item,
+                                                                                                                 'seed_id',
+                                                                                                                 None):
+                existing_item.quantity += quantity
+                print(f"Zwiększono ilość {item.name} w ekwipunku o {quantity}.")
+                return
+
+        # Jeśli nie istnieje, dodaj nowy przedmiot, o ile jest miejsce
         if len(self.items) < self.max_capacity:
+            if hasattr(item, 'quantity'):  # Jeśli przedmiot ma atrybut quantity, ustaw ilość
+                item.quantity = quantity
             self.items.append(item)
-            print(f"Dodano {item.name} do ekwipunku.")
+            print(f"Dodano {item.name} do ekwipunku ({quantity} szt.).")
         else:
             print("Brak miejsca w ekwipunku.")
 
@@ -148,60 +164,57 @@ class Tool:
         return False
 
 
-# Klasa Seed
-class Seed:
-    def __init__(self, seed_id, growth_days, yield_amount, sell_price, quantity=1):
-        self.seed_id = seed_id
-        self.name = f"Nasiono {seed_id}"
-        self.growth_days = growth_days
-        self.yield_amount = yield_amount
-        self.sell_price = sell_price
-        self.quantity = quantity
-
-    @property
-    def yield_name(self):
-        return f"Plon {self.seed_id}"
-
-
 # Klasa Plot
 class Plot:
     def __init__(self):
-        self.is_tilled = False
-        self.is_planted = False
-        self.is_watered = False
+        self.state = "empty"  # Możliwe stany: "empty", "tilled", "planted", "watered"
         self.days_to_harvest = 0
         self.seed = None
 
+    def change_state(self, new_state):
+        """Zmienia stan pola na podany"""
+        self.state = new_state
+
     def till(self):
-        self.is_tilled = True
+        if self.state == "empty":
+            self.change_state("tilled")
+            print("Pole zostało zaorane.")
+        else:
+            print("Pole nie może być zaorane w obecnym stanie.")
 
     def plant(self, seed):
-        self.is_planted = True
-        self.seed = seed
-        self.days_to_harvest = seed.growth_days
-        self.is_watered = False
+        if self.state == "tilled":
+            self.seed = seed
+            self.days_to_harvest = seed.growth_days
+            self.change_state("planted")
+            print(f"Zasadzono {seed.name}.")
+        else:
+            print("Pole musi być najpierw zaorane.")
 
     def water(self):
-        self.is_watered = True
+        if self.state == "planted":
+            self.change_state("watered")
+            print("Pole zostało podlane.")
+        else:
+            print("Pole nie jest zasiane lub jest już podlane.")
 
     def harvest(self):
-        """Zbiera dojrzałą roślinę, jeśli jest gotowa do zbioru"""
-        if self.is_planted and self.days_to_harvest == 0:
+        if self.state == "watered" and self.days_to_harvest == 0:
             harvested_yield = {
                 "name": self.seed.yield_name,
                 "amount": self.seed.yield_amount
             }
-            self.reset_plot()
+            self.reset()
+            print(f"Zebrano plony: {harvested_yield['name']} ({harvested_yield['amount']} szt.).")
             return harvested_yield
+        print("Roślina nie jest gotowa do zbioru.")
         return None
 
-    def reset_plot(self):
+    def reset(self):
         """Resetuje pole do stanu początkowego"""
-        self.is_tilled = False
-        self.is_planted = False
-        self.is_watered = False
-        self.days_to_harvest = 0
+        self.state = "empty"
         self.seed = None
+        self.days_to_harvest = 0
 
 
 # Klasa Skill
@@ -342,3 +355,4 @@ class Game:
 if __name__ == "__main__":
     game = Game()
     game.run()
+
