@@ -71,8 +71,8 @@ class Player:
         self.inventory.add_item(Tool("Siekiera"))
         self.inventory.add_item(Tool("Kilof"))
         self.inventory.add_item(Tool("Kosa"))
-        self.inventory.add_item(Seed(seed_id=1, growth_days=10, yield_amount=4, sell_price=15, quantity=5))
-        self.inventory.add_item(Seed(seed_id=2, growth_days=15, yield_amount=6, sell_price=20, quantity=5))
+        self.inventory.add_item(Seed(seed_id=1, growth_days=10, yield_range=4, sell_price=15, quantity=5))
+        self.inventory.add_item(Seed(seed_id=2, growth_days=15, yield_range=6, sell_price=20, quantity=5))
 
 
     def use_tool(self, tool_name, plot):
@@ -202,7 +202,7 @@ class Plot:
         if self.state == "watered" and self.days_to_harvest == 0:
             harvested_yield = {
                 "name": self.seed.yield_name,
-                "amount": self.seed.yield_amount
+                "amount": self.seed.yield_range
             }
             self.reset()
             print(f"Zebrano plony: {harvested_yield['name']} ({harvested_yield['amount']} szt.).")
@@ -249,8 +249,8 @@ class Game:
             for idx, plot in enumerate(self.plots, 1):
                 status = (
                     f"Pole {idx}: "
-                    f"{'Zaorane' if plot.is_tilled else 'Niezaorane'}, "
-                    f"{'Zasiane' if plot.is_planted else 'Puste'}, "
+                    f"{'Zaorane' if plot.state == 'tilled' else 'Niezaorane'}, "
+                    f"{'Zasiane' if plot.state == 'planted' else 'Puste'}, "
                     f"Do zbioru: {plot.days_to_harvest} dni"
                 )
                 print(status)
@@ -298,7 +298,7 @@ class Game:
                         self.player.add_to_inventory(Seed(
                             seed_id=int(harvested_seed["name"].split()[-1]),
                             growth_days=0,
-                            yield_amount=harvested_seed["amount"],
+                            yield_range=harvested_seed["amount"],
                             sell_price=0,
                             quantity=1
                         ))
