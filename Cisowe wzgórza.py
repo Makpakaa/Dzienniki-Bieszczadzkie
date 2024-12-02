@@ -247,12 +247,20 @@ class Game:
     def manage_plots(self):
         while True:  # Pętla umożliwia pozostanie w menu zarządzania polami
             for idx, plot in enumerate(self.plots, 1):
-                status = (
-                    f"Pole {idx}: "
-                    f"{'Zaorane' if plot.state == 'tilled' else 'Niezaorane'}, "
-                    f"{'Zasiane' if plot.state == 'planted' else 'Puste'}, "
-                    f"Do zbioru: {plot.days_to_harvest} dni"
-                )
+                if plot.state == "empty":
+                    status = f"Pole {idx}: Puste"
+                elif plot.state == "tilled":
+                    status = f"Pole {idx}: Zaorane"
+                elif plot.state == "planted":
+                    status = f"Pole {idx}: Zasiane"
+                elif plot.state == "watered":
+                    status = f"Pole {idx}: Zasiane (Podlane)"
+                else:
+                    status = f"Pole {idx}: {plot.state}"
+
+                if plot.days_to_harvest > 0:
+                    status += f", Do zbioru: {plot.days_to_harvest} dni"
+
                 print(status)
 
             action = input("\n1. Przygotuj pole | 2. Posadź roślinę | 3. Zbierz dojrzałe plony | 4. Wróć: ")
@@ -260,8 +268,12 @@ class Game:
                 try:
                     plot_idx = int(input("Wybierz pole (1-5): ")) - 1
                     if 0 <= plot_idx < len(self.plots):
-                        self.plots[plot_idx].till()
-                        print(f"Pole {plot_idx + 1} zostało przygotowane.")
+                        # Sprawdź, czy gracz ma motykę w ekwipunku
+                        if self.player.inventory.get_tool("Motyka"):
+                            self.plots[plot_idx].till()
+                            print(f"Pole {plot_idx + 1} zostało przygotowane.")
+                        else:
+                            print("Nie masz motyki w ekwipunku. Nie można przygotować pola.")
                     else:
                         print("Nieprawidłowy numer pola.")
                 except ValueError:
@@ -339,8 +351,11 @@ class Game:
                 print("Odpoczywasz i przechodzisz do następnego dnia...")
                 self.day += 1
                 for plot in self.plots:
-                    if plot.is_planted and plot.days_to_harvest > 0:
+                    if plot.state == "watered" and plot.days_to_harvest > 0:
                         plot.days_to_harvest -= 1
+                        plot.change_state("planted")  # Reset stanu do "planted" po podlewaniu
+                    elif plot.state == "planted":
+                        print(f"Pole {self.plots.index(plot) + 1} wymaga podlania, aby roślina mogła rosnąć.")
                         if plot.days_to_harvest == 0:
                             print(f"Roślina na polu {self.plots.index(plot) + 1} jest gotowa do zbioru!")
             elif choice == "4":
