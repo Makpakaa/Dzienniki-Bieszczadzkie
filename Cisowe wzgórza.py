@@ -244,102 +244,143 @@ class Game:
             return self.main_menu()
         return choice
 
-
-
-
-
     def manage_plots(self):
         while True:  # Pętla umożliwia pozostanie w menu zarządzania polami
+            print("\n--- Zarządzanie polami ---")
             for idx, plot in enumerate(self.plots, 1):
-                if plot.state == "empty":
-                    status = f"Pole {idx}: Puste"
-                elif plot.state == "tilled":
-                    status = f"Pole {idx}: Zaorane"
-                elif plot.state == "planted":
-                    status = f"Pole {idx}: Zasiane"
-                elif plot.state == "watered":
-                    status = f"Pole {idx}: Zasiane (Podlane)"
-                else:
-                    status = f"Pole {idx}: {plot.state}"
-
-                if plot.days_to_harvest > 0:
-                    status += f", Do zbioru: {plot.days_to_harvest} dni"
-
+                status = (
+                    f"Pole {idx}: "
+                    f"{'Puste' if plot.state == 'empty' else ''}"
+                    f"{'Zaorane' if plot.state == 'tilled' else ''}"
+                    f"{'Zasiane' if plot.state == 'planted' else ''}"
+                    f"{'Podlane' if plot.state == 'watered' else ''}"
+                    f", Do zbioru: {plot.days_to_harvest} dni" if plot.days_to_harvest > 0 else ''
+                )
                 print(status)
 
-            action = input("\n1. Przygotuj pole | 2. Posadź roślinę | 3. Zbierz dojrzałe plony | 4. Wróć: ")
+            action = input("\n1. Przygotuj pola | 2. Posadź rośliny | 3. Zbierz plony | 4. Wróć: ")
+
             if action == "1":
-                try:
-                    plot_idx = int(input("Wybierz pole (1-5): ")) - 1
-                    if 0 <= plot_idx < len(self.plots):
-                        # Sprawdź, czy gracz ma motykę w ekwipunku
-                        if self.player.inventory.get_tool("Motyka"):
-                            self.plots[plot_idx].till()
-                            print(f"Pole {plot_idx + 1} zostało przygotowane.")
-                        else:
-                            print("Nie masz motyki w ekwipunku. Nie można przygotować pola.")
-                    else:
-                        print("Nieprawidłowy numer pola.")
-                except ValueError:
-                    print("Podaj poprawny numer pola.")
+                self.prepare_fields()
             elif action == "2":
-                plot_idx = int(input("Wybierz pole (1-5): ")) - 1
-                if 0 <= plot_idx < len(self.plots):
-                    available_seeds = [
-                        seed for seed in self.player.inventory.items if isinstance(seed, Seed)
-                    ]
-                    if not available_seeds:
-                        print("Nie masz żadnych nasion w ekwipunku.")
-                        continue  # Powrót do menu zarządzania polami
-                    print("Dostępne nasiona:")
-                    for i, seed in enumerate(available_seeds, 1):
-                        print(f"{i}. {seed.name} (Czas wzrostu: {seed.growth_days} dni)")
-                    try:
-                        seed_choice = int(input("Wybierz nasiono (1-{}): ".format(len(available_seeds)))) - 1
-                        if 0 <= seed_choice < len(available_seeds):
-                            seed = available_seeds[seed_choice]
-                            self.plots[plot_idx].plant(seed)
-                            print(f"Zasadzono {seed.name} na polu {plot_idx + 1}.")
-                        else:
-                            print("Nieprawidłowy wybór nasiona.")
-                    except ValueError:
-                        print("Podaj poprawny numer nasiona.")
-                else:
-                    print("Nieprawidłowy numer pola.")
+                self.plant_seeds()
             elif action == "3":
-                plot_idx = int(input("Wybierz pole (1-5): ")) - 1
-                if 0 <= plot_idx < len(self.plots):
-                    harvested_seed = self.plots[plot_idx].harvest()
-                    if harvested_seed:
-                        self.player.add_to_inventory(Seed(
-                            seed_id=int(harvested_seed["name"].split()[-1]),
-                            growth_days=0,
-                            yield_range=harvested_seed["amount"],
-                            sell_price=0,
-                            quantity=1
-                        ))
-                        print(f"Zebrano {harvested_seed['name']}. Dodano do ekwipunku.")
-                    else:
-                        print("Na tym polu nie ma dojrzałych roślin do zebrania.")
-                else:
-                    print("Nieprawidłowy numer pola.")
+                self.harvest_crops()
             elif action == "4":
                 print("Powrót do menu głównego.")
-                break  # Wyjście z pętli i powrót do menu głównego
+                break  # Wyjście z pętli
             else:
                 print("Nieprawidłowy wybór. Spróbuj ponownie.")
 
+    def prepare_fields(self):
+        while True:
+            print("\nWybierz pola do zaorania (oddzielaj numery spacją). Dostępne pola:")
+            available_fields = [idx + 1 for idx, plot in enumerate(self.plots) if plot.state == "empty"]
 
+            if not available_fields:
+                print("Brak dostępnych pól do zaorania.")
+                return
 
-    def harvest(self):
-        if self.is_planted and self.days_to_harvest == 0:
-            print(f"Zebrano plony z pola: {self.seed.name}")
-            self.is_planted = False
-            self.is_tilled = False
-            self.is_watered = False
-            self.seed = None
-        else:
-            print("Roślina nie jest gotowa do zbioru.")
+            print(", ".join(map(str, available_fields)))
+            choice = input("Wybierz pola (np. 1 2 3) lub wpisz 0, aby wrócić: ")
+
+            if choice == "0":
+                print("Anulowano zaorywanie.")
+                return
+
+            try:
+                chosen_fields = list(map(int, choice.split()))
+                for field_idx in chosen_fields:
+                    if field_idx in available_fields:
+                        # Sprawdź, czy gracz ma motykę
+                        if not self.player.inventory.get_tool("Motyka"):
+                            print("Nie masz motyki. Nie można zaorać pola.")
+                            return
+
+                        self.plots[field_idx - 1].till()
+                        print(f"Pole {field_idx} zostało zaorane.")
+                    else:
+                        print(f"Pole {field_idx} nie jest dostępne do zaorania.")
+            except ValueError:
+                print("Nieprawidłowy wybór. Spróbuj ponownie.")
+
+    def plant_seeds(self):
+        while True:
+            print("\nWybierz pola do zasiania (oddzielaj numery spacją). Dostępne pola:")
+            available_fields = [idx + 1 for idx, plot in enumerate(self.plots) if plot.state == "tilled"]
+
+            if not available_fields:
+                print("Brak dostępnych pól do zasiania.")
+                return
+
+            print(", ".join(map(str, available_fields)))
+            choice = input("Wybierz pola (np. 1 2 3) lub wpisz 0, aby wrócić: ")
+
+            if choice == "0":
+                print("Anulowano sianie.")
+                return
+
+            available_seeds = [seed for seed in self.player.inventory.items if isinstance(seed, Seed)]
+            if not available_seeds:
+                print("Brak nasion w ekwipunku.")
+                return
+
+            print("Dostępne nasiona:")
+            for idx, seed in enumerate(available_seeds, 1):
+                print(f"{idx}. {seed.name} (Czas wzrostu: {seed.growth_days} dni)")
+
+            try:
+                chosen_fields = list(map(int, choice.split()))
+                seed_choice = int(input("Wybierz nasiono (np. 1): ")) - 1
+                if seed_choice < 0 or seed_choice >= len(available_seeds):
+                    print("Nieprawidłowy wybór nasiona.")
+                    continue
+
+                seed = available_seeds[seed_choice]
+                for field_idx in chosen_fields:
+                    if field_idx in available_fields:
+                        self.plots[field_idx - 1].plant(seed)
+                        print(f"Zasadzono {seed.name} na polu {field_idx}.")
+                    else:
+                        print(f"Pole {field_idx} nie jest dostępne do siania.")
+            except ValueError:
+                print("Nieprawidłowy wybór. Spróbuj ponownie.")
+
+    def harvest_crops(self):
+        while True:
+            print("\nWybierz pola do zbioru (oddzielaj numery spacją). Dostępne pola:")
+            available_fields = [idx + 1 for idx, plot in enumerate(self.plots) if
+                                plot.state == "watered" and plot.days_to_harvest == 0]
+
+            if not available_fields:
+                print("Brak pól gotowych do zbioru.")
+                return
+
+            print(", ".join(map(str, available_fields)))
+            choice = input("Wybierz pola (np. 1 2 3) lub wpisz 0, aby wrócić: ")
+
+            if choice == "0":
+                print("Anulowano zbiór.")
+                return
+
+            try:
+                chosen_fields = list(map(int, choice.split()))
+                for field_idx in chosen_fields:
+                    if field_idx in available_fields:
+                        harvested_yield = self.plots[field_idx - 1].harvest()
+                        if harvested_yield:
+                            self.player.add_to_inventory(Seed(
+                                seed_id=int(harvested_yield["name"].split()[-1]),
+                                growth_days=0,
+                                yield_range=(harvested_yield["amount"], harvested_yield["amount"]),
+                                sell_price=0,
+                                quantity=1
+                            ))
+                            print(f"Zebrano {harvested_yield['name']} z pola {field_idx}.")
+                    else:
+                        print(f"Pole {field_idx} nie jest dostępne do zbioru.")
+            except ValueError:
+                print("Nieprawidłowy wybór. Spróbuj ponownie.")
 
     def run(self):
         print("Gra rozpoczęta!")
@@ -348,25 +389,36 @@ class Game:
             if choice == "1":
                 self.manage_plots()
             elif choice == "2":
-                print("Ekwipunek gracza:")
+                print("\nEkwipunek gracza:")
                 for item in self.player.inventory.items:
                     print(f"- {item.name}")
             elif choice == "3":
-                print("Odpoczywasz i przechodzisz do następnego dnia...")
+                print("\nOdpoczywasz i przechodzisz do następnego dnia...")
                 self.day += 1
-                for plot in self.plots:
+                for idx, plot in enumerate(self.plots, 1):
                     if plot.state == "watered" and plot.days_to_harvest > 0:
                         plot.days_to_harvest -= 1
                         plot.change_state("planted")  # Reset stanu do "planted" po podlewaniu
+                        print(f"Pole {idx}: Roślina rośnie. Pozostało {plot.days_to_harvest} dni do zbioru.")
                     elif plot.state == "planted":
-                        print(f"Pole {self.plots.index(plot) + 1} wymaga podlania, aby roślina mogła rosnąć.")
-                        if plot.days_to_harvest == 0:
-                            print(f"Roślina na polu {self.plots.index(plot) + 1} jest gotowa do zbioru!")
+                        print(f"Pole {idx}: Wymaga podlania, aby roślina mogła rosnąć.")
+                    elif plot.state == "watered" and plot.days_to_harvest == 0:
+                        print(f"Pole {idx}: Roślina jest gotowa do zbioru!")
             elif choice == "4":
-                print("Zakończono grę.")
+                print("\nZakończono grę.")
                 self.running = False
             else:
-                print("Nieprawidłowy wybór. Spróbuj ponownie.")
+                print("\nNieprawidłowy wybór. Spróbuj ponownie.")
+
+
+
+
+
+
+
+
+
+
 
 
 
