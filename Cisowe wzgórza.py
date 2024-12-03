@@ -245,7 +245,7 @@ class Game:
         return choice
 
     def manage_plots(self):
-        while True:  # Pętla umożliwia pozostanie w menu zarządzania polami
+        while True:
             print("\n--- Zarządzanie polami ---")
             for idx, plot in enumerate(self.plots, 1):
                 status = (
@@ -258,7 +258,7 @@ class Game:
                 )
                 print(status)
 
-            action = input("\n1. Przygotuj pola | 2. Posadź rośliny | 3. Zbierz plony | 4. Wróć: ")
+            action = input("\n1. Przygotuj pola | 2. Posadź rośliny | 3. Zbierz plony | 4. Podlej pola | 5. Wróć: ")
 
             if action == "1":
                 self.prepare_fields()
@@ -267,10 +267,13 @@ class Game:
             elif action == "3":
                 self.harvest_crops()
             elif action == "4":
+                self.water_fields()
+            elif action == "5":
                 print("Powrót do menu głównego.")
-                break  # Wyjście z pętli
+                break
             else:
                 print("Nieprawidłowy wybór. Spróbuj ponownie.")
+
 
     def prepare_fields(self):
         while True:
@@ -303,6 +306,7 @@ class Game:
                         print(f"Pole {field_idx} nie jest dostępne do zaorania.")
             except ValueError:
                 print("Nieprawidłowy wybór. Spróbuj ponownie.")
+
 
     def plant_seeds(self):
         while True:
@@ -346,6 +350,7 @@ class Game:
             except ValueError:
                 print("Nieprawidłowy wybór. Spróbuj ponownie.")
 
+
     def harvest_crops(self):
         while True:
             print("\nWybierz pola do zbioru (oddzielaj numery spacją). Dostępne pola:")
@@ -382,16 +387,96 @@ class Game:
             except ValueError:
                 print("Nieprawidłowy wybór. Spróbuj ponownie.")
 
+# użycie konewki
+    def water_fields(self):
+        tool = self.player.inventory.get_tool("Konewka")
+
+        if not tool:
+            print("Nie masz konewki w ekwipunku.")
+            return
+
+        print("\nWybierz pola do podlania (oddzielaj numery spacją). Dostępne pola:")
+        available_fields = [idx + 1 for idx, plot in enumerate(self.plots) if plot.state == "planted"]
+
+        if not available_fields:
+            print("Brak pól do podlania.")
+            return
+
+        print(", ".join(map(str, available_fields)))
+        choice = input("Wybierz pola (np. 1 2 3) lub wpisz 0, aby wrócić: ")
+
+        if choice == "0":
+            print("Anulowano podlewanie.")
+            return
+
+        try:
+            chosen_fields = list(map(int, choice.split()))
+            for field_idx in chosen_fields:
+                if field_idx in available_fields:
+                    if tool.use_water(1):
+                        self.plots[field_idx - 1].water()
+                        print(f"Pole {field_idx} zostało podlane.")
+                    else:
+                        print("Konewka jest pusta. Napełnij ją w studni.")
+                        break
+                else:
+                    print(f"Pole {field_idx} nie jest dostępne do podlania.")
+        except ValueError:
+            print("Nieprawidłowy wybór. Spróbuj ponownie.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     def run(self):
         print("Gra rozpoczęta!")
         while self.running:
             choice = self.main_menu()
             if choice == "1":
                 self.manage_plots()
+
             elif choice == "2":
                 print("\nEkwipunek gracza:")
                 for item in self.player.inventory.items:
                     print(f"- {item.name}")
+
+                refill = input("Czy chcesz napełnić konewkę? (1. Tak / 2. Nie): ").strip()
+                if refill == "1":
+                    tool = self.player.inventory.get_tool("Konewka")
+                    if tool:
+                        tool.capacity = 100
+                        print("Konewka została napełniona.")
+                    else:
+                        print("Nie masz konewki.")
+                elif refill == "2":
+                    print("Nie napełniono konewki.")
+                else:
+                    print("Nieprawidłowy wybór. Wybierz 1 lub 2.")
+
             elif choice == "3":
                 print("\nOdpoczywasz i przechodzisz do następnego dnia...")
                 self.day += 1
@@ -404,6 +489,7 @@ class Game:
                         print(f"Pole {idx}: Wymaga podlania, aby roślina mogła rosnąć.")
                     elif plot.state == "watered" and plot.days_to_harvest == 0:
                         print(f"Pole {idx}: Roślina jest gotowa do zbioru!")
+
             elif choice == "4":
                 print("\nZakończono grę.")
                 self.running = False
