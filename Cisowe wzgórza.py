@@ -244,6 +244,10 @@ class Game:
             return self.main_menu()
         return choice
 
+
+
+
+
     def manage_plots(self):
         while True:  # Pętla umożliwia pozostanie w menu zarządzania polami
             for idx, plot in enumerate(self.plots, 1):
