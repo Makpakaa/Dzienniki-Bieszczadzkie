@@ -102,10 +102,6 @@ class Player:
             print("Brak miejsca w ekwipunku. Nie można zebrać plonu.")
 
 
-
-
-
-
 # Klasa Inventory
 class Inventory:
     def __init__(self):
@@ -244,6 +240,7 @@ class Game:
             return self.main_menu()
         return choice
 
+
     def manage_plots(self):
         while True:
             print("\n--- Zarządzanie polami ---")
@@ -275,6 +272,7 @@ class Game:
                 print("Nieprawidłowy wybór. Spróbuj ponownie.")
 
 
+# przygotowanie pola
     def prepare_fields(self):
         while True:
             print("\nWybierz pola do zaorania (oddzielaj numery spacją). Dostępne pola:")
@@ -324,14 +322,14 @@ class Game:
                 print("Anulowano sianie.")
                 return
 
-            available_seeds = [seed for seed in self.player.inventory.items if isinstance(seed, Seed)]
+            available_seeds = [seed for seed in self.player.inventory.items if isinstance(seed, Seed) and seed.quantity > 0]
             if not available_seeds:
                 print("Brak nasion w ekwipunku.")
                 return
 
             print("Dostępne nasiona:")
             for idx, seed in enumerate(available_seeds, 1):
-                print(f"{idx}. {seed.name} (Czas wzrostu: {seed.growth_days} dni)")
+                print(f"{idx}. {seed.name} (Czas wzrostu: {seed.growth_days} dni, Ilość: {seed.quantity} szt.)")
 
             try:
                 chosen_fields = list(map(int, choice.split()))
@@ -343,49 +341,54 @@ class Game:
                 seed = available_seeds[seed_choice]
                 for field_idx in chosen_fields:
                     if field_idx in available_fields:
-                        self.plots[field_idx - 1].plant(seed)
-                        print(f"Zasadzono {seed.name} na polu {field_idx}.")
+                        if seed.quantity > 0:
+                            self.plots[field_idx - 1].plant(seed)
+                            seed.quantity -= 1
+                            print(f"Zasadzono {seed.name} na polu {field_idx}. Pozostało {seed.quantity} szt.")
+                        else:
+                            print(f"Nie masz wystarczającej ilości nasion {seed.name}.")
+                            break
                     else:
                         print(f"Pole {field_idx} nie jest dostępne do siania.")
             except ValueError:
                 print("Nieprawidłowy wybór. Spróbuj ponownie.")
 
-
+# mechanizm zbioru plonów i dodawania ich do ekwipunku gracza
     def harvest_crops(self):
-        while True:
-            print("\nWybierz pola do zbioru (oddzielaj numery spacją). Dostępne pola:")
-            available_fields = [idx + 1 for idx, plot in enumerate(self.plots) if
-                                plot.state == "watered" and plot.days_to_harvest == 0]
+        print("\nWybierz pola do zbioru plonów (oddzielaj numery spacją). Dostępne pola:")
+        available_fields = [idx + 1 for idx, plot in enumerate(self.plots) if plot.state == "watered" and plot.days_to_harvest == 0]
 
-            if not available_fields:
-                print("Brak pól gotowych do zbioru.")
-                return
+        if not available_fields:
+            print("Brak pól z gotowymi plonami do zbioru.")
+            return
 
-            print(", ".join(map(str, available_fields)))
-            choice = input("Wybierz pola (np. 1 2 3) lub wpisz 0, aby wrócić: ")
+        print(", ".join(map(str, available_fields)))
+        choice = input("Wybierz pola (np. 1 2 3) lub wpisz 0, aby wrócić: ")
 
-            if choice == "0":
-                print("Anulowano zbiór.")
-                return
+        if choice == "0":
+            print("Anulowano zbiór.")
+            return
 
-            try:
-                chosen_fields = list(map(int, choice.split()))
-                for field_idx in chosen_fields:
-                    if field_idx in available_fields:
-                        harvested_yield = self.plots[field_idx - 1].harvest()
-                        if harvested_yield:
-                            self.player.add_to_inventory(Seed(
-                                seed_id=int(harvested_yield["name"].split()[-1]),
-                                growth_days=0,
-                                yield_range=(harvested_yield["amount"], harvested_yield["amount"]),
-                                sell_price=0,
-                                quantity=1
-                            ))
-                            print(f"Zebrano {harvested_yield['name']} z pola {field_idx}.")
+        try:
+            chosen_fields = list(map(int, choice.split()))
+            for field_idx in chosen_fields:
+                if field_idx in available_fields:
+                    harvested_yield = self.plots[field_idx - 1].harvest()
+                    if harvested_yield:
+                        # Dodaj plony do ekwipunku
+                        self.player.inventory.add_item(Seed(
+                            seed_id=self.plots[field_idx - 1].seed.seed_id,
+                            growth_days=0,
+                            yield_range=harvested_yield["amount"],
+                            sell_price=self.plots[field_idx - 1].seed.sell_price,
+                            quantity=harvested_yield["amount"]
+                        ))
+                        print(f"Zebrano {harvested_yield['name']}. Dodano do ekwipunku.")
                     else:
-                        print(f"Pole {field_idx} nie jest dostępne do zbioru.")
-            except ValueError:
-                print("Nieprawidłowy wybór. Spróbuj ponownie.")
+                        print(f"Pole {field_idx} nie jest gotowe do zbioru.")
+        except ValueError:
+            print("Nieprawidłowy wybór. Spróbuj ponownie.")
+
 
 # użycie konewki
     def water_fields(self):
@@ -433,33 +436,52 @@ class Game:
             if choice == "1":
                 self.manage_plots()
 
+# ekwipunek gracza
             elif choice == "2":
-                print("\nEkwipunek gracza:")
-                for item in self.player.inventory.items:
-                    if isinstance(item, Tool) and item.name == "Konewka":
-                        print(f"- {item.name}: {item.capacity}/100 użyć")
-                    else:
-                        print(f"- {item.name}")
+                while True:  # Pętla dla menu ekwipunku
+                    print("\nEkwipunek gracza:")
+                    tools = [item for item in self.player.inventory.items if isinstance(item, Tool)]
+                    seeds = [item for item in self.player.inventory.items if isinstance(item, Seed)]
+                    numbered_items = tools + seeds
 
-                tool_choice = input("\nWybierz przedmiot z ekwipunku (np. 'Konewka') lub wpisz 0, aby wrócić: ").strip()
-
-                if tool_choice.lower() == "konewka":
-                    tool = self.player.inventory.get_tool("Konewka")
-                    if not tool:
-                        print("Nie masz konewki.")
-                    else:
-                        action = input("\nCo chcesz zrobić z konewką? (1. Napełnij / 2. Wróć): ").strip()
-                        if action == "1":
-                            tool.capacity = 100
-                            print("Konewka została napełniona.")
-                        elif action == "2":
-                            print("Anulowano.")
+                    for idx, item in enumerate(numbered_items, 1):
+                        if isinstance(item, Tool) and item.name == "Konewka":
+                            print(f"{idx}. {item.name}: {item.capacity}/100 użyć")
+                        elif isinstance(item, Seed):
+                            print(f"{idx}. {item.name}: {item.quantity} szt.")
                         else:
-                            print("Nieprawidłowy wybór.")
-                elif tool_choice == "0":
-                    print("Wrócono do menu głównego.")
-                else:
-                    print("Nie znaleziono takiego przedmiotu w ekwipunku.")
+                            print(f"{idx}. {item.name}")
+
+                    print("0. Wróć do menu głównego")
+                    choice = input("Wybierz numer przedmiotu, aby wybrać (lub 0, aby wrócić): ").strip()
+
+                    if choice == "0":
+                        print("Wrócono do menu głównego.")
+                        break
+
+                    try:
+                        choice = int(choice)
+                        if 1 <= choice <= len(numbered_items):
+                            selected_item = numbered_items[choice - 1]
+                            if isinstance(selected_item, Tool) and selected_item.name == "Konewka":
+                                while True:  # Pętla dla interakcji z konewką
+                                    print(f"\nKonewka: {selected_item.capacity}/100 użyć")
+                                    action = input("1. Napełnij konewkę | 0. Wróć: ").strip()
+                                    if action == "1":
+                                        selected_item.capacity = 100
+                                        print("Konewka została napełniona.")
+                                    elif action == "0":
+                                        print("Wrócono do ekwipunku.")
+                                        break
+                                    else:
+                                        print("Nieprawidłowy wybór. Spróbuj ponownie.")
+                            else:
+                                print(f"Wybrano: {selected_item.name}")
+                        else:
+                            print("Nieprawidłowy numer przedmiotu. Wybierz z listy.")
+                    except ValueError:
+                        print("Podaj poprawny numer przedmiotu.")
+
 
             elif choice == "3":
                 print("\nOdpoczywasz i przechodzisz do następnego dnia...")
@@ -481,18 +503,7 @@ class Game:
                 print("\nNieprawidłowy wybór. Spróbuj ponownie.")
 
 
-
-
-
-
-
-
-
-
-
-
-
-
+# zakończenie pętli gry
 if __name__ == "__main__":
     game = Game()
     game.run()
