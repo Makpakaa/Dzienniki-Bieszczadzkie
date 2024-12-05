@@ -426,32 +426,6 @@ class Game:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     def run(self):
         print("Gra rozpoczęta!")
         while self.running:
@@ -462,20 +436,30 @@ class Game:
             elif choice == "2":
                 print("\nEkwipunek gracza:")
                 for item in self.player.inventory.items:
-                    print(f"- {item.name}")
-
-                refill = input("Czy chcesz napełnić konewkę? (1. Tak / 2. Nie): ").strip()
-                if refill == "1":
-                    tool = self.player.inventory.get_tool("Konewka")
-                    if tool:
-                        tool.capacity = 100
-                        print("Konewka została napełniona.")
+                    if isinstance(item, Tool) and item.name == "Konewka":
+                        print(f"- {item.name}: {item.capacity}/100 użyć")
                     else:
+                        print(f"- {item.name}")
+
+                tool_choice = input("\nWybierz przedmiot z ekwipunku (np. 'Konewka') lub wpisz 0, aby wrócić: ").strip()
+
+                if tool_choice.lower() == "konewka":
+                    tool = self.player.inventory.get_tool("Konewka")
+                    if not tool:
                         print("Nie masz konewki.")
-                elif refill == "2":
-                    print("Nie napełniono konewki.")
+                    else:
+                        action = input("\nCo chcesz zrobić z konewką? (1. Napełnij / 2. Wróć): ").strip()
+                        if action == "1":
+                            tool.capacity = 100
+                            print("Konewka została napełniona.")
+                        elif action == "2":
+                            print("Anulowano.")
+                        else:
+                            print("Nieprawidłowy wybór.")
+                elif tool_choice == "0":
+                    print("Wrócono do menu głównego.")
                 else:
-                    print("Nieprawidłowy wybór. Wybierz 1 lub 2.")
+                    print("Nie znaleziono takiego przedmiotu w ekwipunku.")
 
             elif choice == "3":
                 print("\nOdpoczywasz i przechodzisz do następnego dnia...")
