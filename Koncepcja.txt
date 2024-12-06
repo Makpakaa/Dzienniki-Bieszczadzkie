@@ -1,0 +1,2 @@
+okej. inaczej. na początku gry ekwipunek gracza niech jest pusty. nasiona i narzędzia gracz sam pobierze z magazynu koło domu. w menu głównym najpierw niech jest inne menu:
+1. Idź do - tu gracz wybierze obszar gry. na początku dajmy na to: 1. Chata, 2. Podwórko, 3. ogródek

@@ -62,10 +62,9 @@ class Player:
 
         # Dodaj początkowe rośliny (nasiona) do ekwipunku gracza
         for seed in plants[:2]:  # Pierwsze dwa nasiona jako startowe
+
+
             self.inventory.add_item(seed, quantity=3)  # Dodaj po 3 sztuki każdego nasiona
-
-
-
         self.inventory.add_item(Tool("Motyka"))
         self.inventory.add_item(Tool("Konewka", capacity=100))
         self.inventory.add_item(Tool("Siekiera"))
@@ -428,7 +427,7 @@ class Game:
             print("Nieprawidłowy wybór. Spróbuj ponownie.")
 
 
-
+# Menu główne
     def run(self):
         print("Gra rozpoczęta!")
         while self.running:
