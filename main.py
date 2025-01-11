@@ -39,6 +39,16 @@ def game_loop(screen):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.KEYDOWN:
+                # Dodajemy czytanie klawiszy
+                if event.key == pygame.K_UP:
+                    print("Naciśnięto strzałkę w górę")
+                elif event.key == pygame.K_DOWN:
+                    print("Naciśnięto strzałkę w dół")
+                elif event.key == pygame.K_LEFT:
+                    print("Naciśnięto strzałkę w lewo")
+                elif event.key == pygame.K_RIGHT:
+                    print("Naciśnięto strzałkę w prawo")
 
         print("\nMapa:")
         game_map.display_map(player.position)
