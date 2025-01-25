@@ -1,226 +1,136 @@
-# === FILE: main.py ===
-# Ten plik zawiera główną pętlę gry, inicjalizację pygame oraz menu główne.
-# Odpowiada za uruchamianie gry i integrację wszystkich modułów.
-#
-# Wymagane pliki:
-# - player.py (zawiera klasę Player)
-# - map.py (zawiera klasę Map)
-# - npc.py (zawiera klasę NPC)
-# - quest.py (zawiera klasę Quest)
-# - building.py (zawiera klasę Building)
-# - tools.py (zawiera klasy Tool i Weapon)
-# - clothing.py (zawiera klasę Clothing)
-# - animals.py (zawiera klasę Animal)
-# - plants.py (zawiera klasy Plant, Crop, Tree, Bush, Seedling)
-# - shop.py (zawiera klasę Shop)
-#
-
 import pygame
 import sys
-import json
-from player import Player
-from map import Map, Tile
-from npc import NPC
-from quest import Quest
-from building import Building
-from tools import Tool, Weapon
-from clothing import Clothing
-from animals import Animal
-from plants import Plant, Crop, Tree, Bush, Seedling
-from shop import Shop
 
-# Inicjalizacja pygame
+# === Funkcja inicjalizująca grę ===
 def initialize_game():
-    def show_logo():
-        print("=== LOGO ===")
-        pygame.time.wait(2000)  # Wyświetlenie logo przez 2 sekundy
-
-    def show_title():
-        print("=== Dzienniki Bieszczadzkie ===")
-        pygame.time.wait(2000)  # Wyświetlenie tytułu przez 2 sekundy
-
     pygame.init()
-    screen = pygame.display.set_mode((800, 600))  # Rozdzielczość okna gry
+    screen = pygame.display.set_mode((800, 600))
     pygame.display.set_caption("Dzienniki Bieszczadzkie")
-    show_logo()
-    show_title()
     return screen
 
+# === Wyświetlenie logo ===
+def show_logo(screen):
+    screen.fill((0, 0, 0))
+    font = pygame.font.SysFont(None, 64)
+    label = font.render("LOGO GRY", True, (255, 255, 0))
+    screen.blit(label, (300, 250))
+    pygame.display.flip()
+    pygame.time.wait(10000)
 
-def save_game(player, filename=None):
-    """Zapisuje stan gry do pliku."""
-    save_data = {
-        "name": player.name,
-        "health": player.health,
-        "stamina": player.stamina,
-        "inventory": player.inventory,
-        "position": player.position
-    }
-    if filename is None:
-        from datetime import datetime
-        filename = datetime.now().strftime('%Y.%m.%d.%H:%M:%S.json')
-    with open(filename, "w") as save_file:
-        json.dump(save_data, save_file)
-    print("Gra została zapisana.")
+# === Wyświetlenie tytułu ===
+def show_title(screen):
+    screen.fill((0, 0, 0))
+    font = pygame.font.SysFont(None, 100)
+    title_text = "Dzienniki\nBieszczadzkie"
+    for i, line in enumerate(title_text.split("\n")):
+        line_label = font.render(line, True, (255, 255, 0))
+        text_rect = line_label.get_rect(center=(400, 250 + i * 100))
+        screen.blit(line_label, text_rect)
+    pygame.display.flip()
+    pygame.time.wait(10000)
 
-
-def load_game(filename=None):
-    """Wczytuje stan gry z pliku."""
-    try:
-        if filename is None:
-            filename = "save_game.json"
-        with open(filename, "r") as save_file:
-            save_data = json.load(save_file)
-            player = Player()
-            player.name = save_data["name"]
-            player.health = save_data["health"]
-            player.stamina = save_data["stamina"]
-            player.inventory = save_data["inventory"]
-            player.position = save_data["position"]
-            print("Gra została wczytana.")
-            return player
-    except FileNotFoundError:
-        print("Brak zapisanego stanu gry. Rozpocznij nową grę.")
-        return None
-
-
-def main_menu():
-    while True:
-        print("=== Dzienniki Bieszczadzkie ===")
-        print("1. Gra")
-        print("2. Opcje")
-        print("3. Wyjdź")
-
-        choice = input("Wybierz opcję: ")
-
-        if choice == "1":
-            return "game"
-        elif choice == "2":
-            print("Opcje: (funkcja w przygotowaniu)")
-        elif choice == "3":
-            pygame.quit()
-            sys.exit()
-        else:
-            print("Nieprawidłowa opcja, spróbuj ponownie.")
-
-
-def game_menu():
-    while True:
-        print("=== Menu Gry ===")
-        print("1. Nowa gra")
-        print("2. Wczytaj grę")
-        print("3. Wróć")
-
-        choice = input("Wybierz opcję: ")
-
-        if choice == "1":
-            return "new_game"
-        elif choice == "2":
-            return "load_game"
-        elif choice == "3":
-            return "back"
-        else:
-            print("Nieprawidłowa opcja, spróbuj ponownie.")
-
-
-def game_loop(screen, player):
-    def initialize_starting_map():
-        starting_map = Map(10, 20)  # Wymiary mapy 10x20 kratek
-
-        # Dodajemy ściany chaty
-        for x in range(10):
-            starting_map.set_tile(x, 0, Tile("wall"))  # Ściana północna
-            starting_map.set_tile(x, 19, Tile("wall"))  # Ściana południowa
-        for y in range(1, 19):
-            starting_map.set_tile(0, y, Tile("wall"))  # Ściana zachodnia
-            starting_map.set_tile(9, y, Tile("wall"))  # Ściana wschodnia
-
-        # Dodajemy drzwi na południowej ścianie
-        starting_map.set_tile(5, 19, Tile("door"))
-
-        # Dodajemy gracza na środku chaty
-        starting_map.set_tile(5, 10, Tile("player"))
-
-        return starting_map
-    def use_bed():
-        print("Gracz korzysta z łóżka. Autozapis gry...")
-        save_game(player)
-        print("Autozapis zakończony.")
-
-    game_map = Map()
-    npc_list = [NPC("Sołtys", {"hello": "Witaj w naszej wiosce!"}),
-                NPC("Babcia", {"quest": "Przynieś mi zioła z lasu."})]
-    quest_list = [Quest("Zioła Mocy", "Zbierz rzadkie zioła dla Babci.", ["Zioła"])]
-
+# === Menu główne gry ===
+def main_menu(screen):
     running = True
     clock = pygame.time.Clock()
+    selected_option = 0
+    options = ["Nowa Gra", "Załaduj Grę", "Wyjście"]
 
     while running:
-        screen.fill((0, 0, 0))
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    selected_option = (selected_option - 1) % len(options)
+                elif event.key == pygame.K_DOWN:
+                    selected_option = (selected_option + 1) % len(options)
+                elif event.key == pygame.K_RETURN:
+                    if selected_option == 0:
+                        return "new_game"
+                    elif selected_option == 1:
+                        print("Załaduj Grę - w przygotowaniu")
+                    elif selected_option == 2:
+                        pygame.quit()
+                        sys.exit()
 
+        screen.fill((0, 0, 0))
+        font = pygame.font.SysFont(None, 48)
+        for i, option in enumerate(options):
+            color = (255, 255, 255) if i == selected_option else (255, 255, 0)
+            label = font.render(option, True, color)
+            screen.blit(label, (300, 200 + i * 60))
+            if i == selected_option:
+                pygame.draw.rect(screen, (255, 255, 255), pygame.Rect(295, 195 + i * 60, 310, 60), 2)
+
+        pygame.display.flip()
+        clock.tick(30)
+
+# === Wyświetlenie wprowadzenia ===
+def show_introduction(screen):
+    screen.fill((0, 0, 0))
+    font = pygame.font.SysFont(None, 36)
+    intro_text = [
+        "Witamy w Dziennikach Bieszczadzkich!",
+        "Jesteś wędrowcem przemierzającym spokojne wzgórza i doliny.",
+        "Twoim celem jest odkrycie tajemnic tej krainy.",
+        "Powodzenia!"
+    ]
+    for i, line in enumerate(intro_text):
+        label = font.render(line, True, (255, 255, 0))
+        screen.blit(label, (50, 200 + i * 40))
+    pygame.display.flip()
+    pygame.time.wait(5000)
+
+# === Wyświetlanie zegara gry ===
+def draw_game_clock(screen, game_time):
+    font = pygame.font.SysFont(None, 24)
+    time_text = f"Czas: {game_time['hour']:02}:{game_time['minute']:02}"
+    date_text = f"Data: {game_time['day']} Wiosna, Rok {game_time['year']}"
+    time_label = font.render(time_text, True, (255, 255, 0))
+    date_label = font.render(date_text, True, (255, 255, 0))
+    screen.blit(time_label, (20, 10))
+    screen.blit(date_label, (20, 40))
+
+# === Aktualizacja czasu gry ===
+def update_game_time(game_time, elapsed_time):
+    game_time['minute'] += elapsed_time // 20000  # 20000 ms = 20 sekund w realnym czasie = 10 minut w grze
+    if game_time['minute'] >= 60:
+        game_time['minute'] = 0
+        game_time['hour'] += 1
+    if game_time['hour'] >= 24:
+        game_time['hour'] = 0
+        game_time['day'] += 1
+
+# === Pętla gry ===
+def game_loop(screen):
+    running = True
+    clock = pygame.time.Clock()
+    game_time = {"hour": 6, "minute": 0, "day": 1, "year": 1}
+    time_accumulator = 0
+
+    while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.KEYDOWN:
-                # Dodajemy czytanie klawiszy
-                if event.key == pygame.K_UP:
-                    print("Naciśnięto strzałkę w górę")
-                elif event.key == pygame.K_DOWN:
-                    print("Naciśnięto strzałkę w dół")
-                elif event.key == pygame.K_LEFT:
-                    print("Naciśnięto strzałkę w lewo")
-                elif event.key == pygame.K_RIGHT:
-                    print("Naciśnięto strzałkę w prawo")
 
-        print("\nMapa:")
-        game_map.display_map(player.position)
+        elapsed_time = clock.tick(60)
+        time_accumulator += elapsed_time
 
-        action = input("Wybierz akcję (move/talk/inventory/save/quit): ")
+        if time_accumulator >= 20000:  # Aktualizacja co 20 sekund
+            update_game_time(game_time, time_accumulator)
+            time_accumulator = 0
 
-        if action == "move":
-            direction = input("Wybierz kierunek (up/down/left/right): ")
-            player.move(direction)
-        elif action == "talk":
-            npc_name = input("Podaj nazwę NPC: ")
-            npc = next((n for n in npc_list if n.name == npc_name), None)
-            if npc:
-                print(npc.talk())
-            else:
-                print("Nie ma takiego NPC.")
-        elif action == "inventory":
-            print("Ekwipunek: ", player.inventory)
-        elif action == "save":
-            save_game(player, filename="save_game.json")
-        elif action == "quit":
-            running = False
-
+        screen.fill((0, 0, 0))
+        draw_game_clock(screen, game_time)
         pygame.display.flip()
-        # Dodajemy kolor żółty dla elementów
-        pygame.draw.rect(screen, (255, 255, 0), pygame.Rect(50, 50, 700, 500), 1)
-        clock.tick(30)
-
 
 if __name__ == "__main__":
     screen = initialize_game()
-    while True:
-        menu_choice = main_menu()
-
-        if menu_choice == "game":
-            game_choice = game_menu()
-
-            if game_choice == "new_game":
-                def show_story():
-                    print("=== Historia Gracza ===")
-                    print("Jesteś wędrowcem przemierzającym Bieszczady...")
-                    print("Twoim celem jest odkrycie tajemnic tej krainy.")
-                    pygame.time.wait(5000)  # Wyświetlanie historii przez 5 sekund
-
-                show_story()
-                player = Player()
-                game_loop(screen, player)
-            elif game_choice == "load_game":
-                player = load_game(filename="save_game.json")
-                if player:
-                    game_loop(screen, player)
-            elif game_choice == "back":
-                continue
+    show_logo(screen)
+    show_title(screen)
+    selected_action = main_menu(screen)
+    if selected_action == "new_game":
+        show_introduction(screen)
+        game_loop(screen)
