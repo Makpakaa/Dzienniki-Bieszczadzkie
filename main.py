@@ -2,24 +2,30 @@ import pygame
 import sys
 import pyttsx3
 
-# === Funkcja inicjalizująca TTS (bez zmian) ===
+# --- Ustawienia planszy 2D ---
+TILE_SIZE = 32
+MAP_SIZE = 200  # mapa 200x200
+MOVE_COOLDOWN = 1  # co ile ms możemy wykonać kolejny krok przy przytrzymaniu klawisza
+
+# === Funkcja inicjalizująca TTS ===
 def initialize_tts():
     engine = pyttsx3.init()
-    # Możesz tu ustawić głośność, prędkość czy głos syntezatora:
+    # Możesz ustawić głośność, prędkość, itp.:
     # engine.setProperty('rate', 150)
     # engine.setProperty('volume', 1.0)
     return engine
 
-# === Funkcja inicjalizująca grę w trybie pełnoekranowym (bez zmian) ===
+# === Funkcja inicjalizująca grę w trybie pełnoekranowym ===
 def initialize_game():
     pygame.init()
     info = pygame.display.Info()
     screen_width = info.current_w
     screen_height = info.current_h
     screen = pygame.display.set_mode((screen_width, screen_height), pygame.FULLSCREEN)
-    pygame.display.set_caption("Dzienniki Bieszczadzkie")
+    pygame.display.set_caption("Dzienniki Bieszczadzkie - Widok 2D")
     return screen
 
+# === Wyświetlanie logo (przykład) ===
 def show_logo(screen, engine):
     screen.fill((0, 0, 0))
     font = pygame.font.SysFont(None, 64)
@@ -32,7 +38,7 @@ def show_logo(screen, engine):
     engine.say("Wyświetlam logo gry. Naciśnij dowolny klawisz, aby przejść dalej.")
     engine.runAndWait()
 
-    wait_duration = 10000  # ms
+    wait_duration = 3000  # ms
     start_time = pygame.time.get_ticks()
     waiting = True
     while waiting:
@@ -43,10 +49,10 @@ def show_logo(screen, engine):
                 sys.exit()
             elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
                 waiting = False
-
         if current_time - start_time >= wait_duration:
             waiting = False
 
+# === Wyświetlanie tytułu (przykład) ===
 def show_title(screen, engine):
     screen.fill((0, 0, 0))
     font = pygame.font.SysFont(None, 100)
@@ -65,7 +71,7 @@ def show_title(screen, engine):
     engine.say("Dzienniki Bieszczadzkie. Naciśnij dowolny klawisz, aby przejść dalej.")
     engine.runAndWait()
 
-    wait_duration = 10000  # ms
+    wait_duration = 3000  # ms
     start_time = pygame.time.get_ticks()
     waiting = True
     while waiting:
@@ -76,11 +82,10 @@ def show_title(screen, engine):
                 sys.exit()
             elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
                 waiting = False
-
         if current_time - start_time >= wait_duration:
             waiting = False
 
-# === Menu główne gry (bez większych zmian) ===
+# === Menu główne gry ===
 def main_menu(screen, engine):
     running = True
     clock = pygame.time.Clock()
@@ -107,10 +112,9 @@ def main_menu(screen, engine):
                 elif event.key == pygame.K_RETURN:
                     engine.say(f"Wybrano opcję: {options[selected_option]}")
                     engine.runAndWait()
-
                     if selected_option == 0:  # Nowa Gra
                         return "new_game"
-                    elif selected_option == 1:  # Załaduj Grę
+                    elif selected_option == 1:  # Załaduj Grę (stub)
                         engine.say("Załaduj Grę - opcja w przygotowaniu.")
                         engine.runAndWait()
                     elif selected_option == 2:  # Wyjście
@@ -124,12 +128,16 @@ def main_menu(screen, engine):
             label = font.render(option, True, color)
             screen.blit(label, (300, 200 + i * 60))
             if i == selected_option:
-                pygame.draw.rect(screen, (255, 255, 255),
-                                 pygame.Rect(295, 195 + i * 60, 310, 60), 2)
+                pygame.draw.rect(
+                    screen, (255, 255, 255),
+                    pygame.Rect(295, 195 + i * 60, 310, 60),
+                    2
+                )
 
         pygame.display.flip()
         clock.tick(30)
 
+# === Wyświetlenie wprowadzenia (przykład) ===
 def show_introduction(screen, engine):
     screen.fill((0, 0, 0))
     font = pygame.font.SysFont(None, 36)
@@ -149,7 +157,7 @@ def show_introduction(screen, engine):
     engine.say(tts_text + " Naciśnij dowolny klawisz, aby przejść dalej.")
     engine.runAndWait()
 
-    wait_duration = 5000  # ms
+    wait_duration = 3000  # ms
     start_time = pygame.time.get_ticks()
     waiting = True
     while waiting:
@@ -160,40 +168,14 @@ def show_introduction(screen, engine):
                 sys.exit()
             elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
                 waiting = False
-
         if current_time - start_time >= wait_duration:
             waiting = False
 
-# === Funkcja wyświetlająca zegar gry (bez zmian) ===
-def draw_game_clock(screen, game_time):
-    font = pygame.font.SysFont(None, 24)
-    time_text = f"Czas: {game_time['hour']:02}:{game_time['minute']:02}"
-    date_text = f"Data: {game_time['day']} Wiosna, Rok {game_time['year']}"
-    time_label = font.render(time_text, True, (255, 255, 0))
-    date_label = font.render(date_text, True, (255, 255, 0))
-    screen.blit(time_label, (20, 10))
-    screen.blit(date_label, (20, 40))
-
-# === Funkcja aktualizująca czas gry (bez zmian) ===
-def update_game_time(game_time, elapsed_time):
-    game_time['minute'] += elapsed_time // 20000  # 20000 ms = 20 sek w realnym => ~10 min w grze
-    if game_time['minute'] >= 60:
-        game_time['minute'] = 0
-        game_time['hour'] += 1
-    if game_time['hour'] >= 24:
-        game_time['hour'] = 0
-        game_time['day'] += 1
-
-# === ZMIANA (1) – Funkcja potwierdzająca wyjście z gry ===
+# === Funkcja potwierdzająca wyjście z gry (z pauzy) ===
 def confirm_quit(screen, engine):
-    """
-    Zwraca 'yes' jeśli użytkownik potwierdzi wyjście z gry,
-    lub 'no' jeśli wróci do menu pauzy.
-    """
     options = ["Tak", "Nie"]
     selected_option = 0
 
-    # Komunikat TTS
     engine.say("Czy na pewno zapisałeś stan gry? Wybierz Tak lub Nie.")
     engine.runAndWait()
 
@@ -205,17 +187,17 @@ def confirm_quit(screen, engine):
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_UP or event.key == pygame.K_DOWN:
-                    selected_option = (selected_option + 1) % 2  # przełączanie 0 <-> 1
+                if event.key in [pygame.K_UP, pygame.K_DOWN]:
+                    selected_option = (selected_option + 1) % 2
                     engine.say(options[selected_option])
                     engine.runAndWait()
                 elif event.key == pygame.K_RETURN:
                     engine.say(f"Wybrano: {options[selected_option]}")
                     engine.runAndWait()
                     if selected_option == 0:
-                        return "yes"  # Tak
+                        return "yes"
                     else:
-                        return "no"   # Nie
+                        return "no"
 
         screen.fill((0, 0, 0))
         font = pygame.font.SysFont(None, 48)
@@ -238,14 +220,8 @@ def confirm_quit(screen, engine):
         pygame.display.flip()
         clock.tick(30)
 
-# === ZMIANA (2) – Funkcja menu pauzy (in-game) ===
+# === Menu pauzy (w trakcie gry) ===
 def pause_menu(screen, engine):
-    """
-    Zwraca:
-      - "resume" jeśli gracz wybierze Wróć do gry
-      - "quit" jeśli gracz wybierze Wyjdź z gry
-      - "continue" przy innych opcjach (np. Zapisz/Wczytaj/Ustawienia – tu tylko stub)
-    """
     options = ["Wróć do gry", "Zapisz grę", "Wczytaj grę", "Ustawienia", "Wyjdź z gry"]
     selected_option = 0
 
@@ -271,24 +247,21 @@ def pause_menu(screen, engine):
                 elif event.key == pygame.K_RETURN:
                     engine.say(f"Wybrano: {options[selected_option]}")
                     engine.runAndWait()
-
                     if selected_option == 0:  # Wróć do gry
                         return "resume"
                     elif selected_option == 1:  # Zapisz grę
                         engine.say("Zapisz grę - opcja w przygotowaniu.")
                         engine.runAndWait()
-                        # Możesz tu wywołać własną logikę zapisu
                     elif selected_option == 2:  # Wczytaj grę
                         engine.say("Wczytaj grę - opcja w przygotowaniu.")
                         engine.runAndWait()
-                        # Możesz tu wywołać własną logikę wczytywania
                     elif selected_option == 3:  # Ustawienia
                         engine.say("Ustawienia - opcja w przygotowaniu.")
                         engine.runAndWait()
-                        # Możesz dodać menu ustawień
                     elif selected_option == 4:  # Wyjdź z gry
                         return "quit"
 
+        # Rysowanie menu pauzy
         screen.fill((0, 0, 0))
         font = pygame.font.SysFont(None, 48)
         pause_label = font.render("Pauza", True, (255, 255, 0))
@@ -308,65 +281,139 @@ def pause_menu(screen, engine):
         pygame.display.flip()
         clock.tick(30)
 
-# === Pętla gry (rozszerzona o obsługę pauzy) ===
-def game_loop(screen, engine):
-    running = True
-    clock = pygame.time.Clock()
-    game_time = {"hour": 6, "minute": 0, "day": 1, "year": 1}
-    time_accumulator = 0
+# === Rysowanie siatki 2D 200x200 cienką żółtą linią w pionie i poziomie ===
+def draw_2d_grid(screen, offset_x, offset_y, color=(255, 255, 0)):
+    # Linie poziome
+    for row in range(MAP_SIZE + 1):
+        y = offset_y + row * TILE_SIZE
+        start_x = offset_x
+        end_x = offset_x + MAP_SIZE * TILE_SIZE
+        pygame.draw.line(screen, color, (start_x, y), (end_x, y), 1)
 
+    # Linie pionowe
+    for col in range(MAP_SIZE + 1):
+        x = offset_x + col * TILE_SIZE
+        start_y = offset_y
+        end_y = offset_y + MAP_SIZE * TILE_SIZE
+        pygame.draw.line(screen, color, (x, start_y), (x, end_y), 1)
+
+# === Ograniczanie wartości do zakresu [min_val, max_val] ===
+def clamp(value, min_val, max_val):
+    return max(min_val, min(value, max_val))
+
+# === Pętla gry 2D (top-down) ===
+def topdown_game_loop(screen, engine):
+    """
+    Plansza 200x200. Każda kratka 32x32.
+    Gracz startuje w środku (100,100),
+    ruch strzałkami, 1 kratka na naciśnięcie/przytrzymanie.
+    ESC = menu pauzy.
+    Znacznik gracza: kwadrat 32x32 w kolorze białym.
+    Syntezator informuje o ruchu z (col,row) na (col2,row2).
+    """
+    clock = pygame.time.Clock()
+
+    # Pozycja startowa gracza (środek planszy)
+    player_col = 100
+    player_row = 100
+
+    # Rozmiar okna
+    screen_width, screen_height = screen.get_size()
+
+    # Ustawiamy offset tak, by gracz był w środku ekranu
+    # player_col * TILE_SIZE daje pikselową pozycję gracza
+    offset_x = screen_width // 2 - (player_col * TILE_SIZE)
+    offset_y = screen_height // 2 - (player_row * TILE_SIZE)
+
+    # Kontrola powtarzania ruchu
+    next_move_time = 0
+    keys_held = {
+        pygame.K_UP: False,
+        pygame.K_DOWN: False,
+        pygame.K_LEFT: False,
+        pygame.K_RIGHT: False
+    }
+
+    running = True
     while running:
+        current_time = pygame.time.get_ticks()
+
         # Obsługa zdarzeń
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == pygame.KEYDOWN:
-                # ZMIANA (3) – wciśnięcie ESC otwiera menu pauzy
                 if event.key == pygame.K_ESCAPE:
+                    # Menu pauzy
                     action = pause_menu(screen, engine)
                     if action == "resume":
-                        # Wróć do gry – nic nie zmieniamy, kontynuujemy pętlę
                         pass
                     elif action == "quit":
-                        # Najpierw zapytaj, czy na pewno zapisałeś grę
                         confirm = confirm_quit(screen, engine)
                         if confirm == "yes":
                             running = False
-                        else:
-                            # powrót do menu pauzy
-                            # Możemy ponownie wywołać pause_menu, aż wybierzemy Resume lub Quit yes
-                            # Tu dla prostoty wracamy do pętli i ESC znowu otwiera menu
-                            pass
+                if event.key in keys_held:
+                    keys_held[event.key] = True
+            elif event.type == pygame.KEYUP:
+                if event.key in keys_held:
+                    keys_held[event.key] = False
 
-        # Aktualizacja stanu gry (zegar itp.)
-        elapsed_time = clock.tick(60)
-        time_accumulator += elapsed_time
-        # Czas upływa tylko gdy nie jesteśmy w pauzie!
-        # Gdy pauza trwa, ta część i tak stoi w miejscu, bo pętla jest „zamrożona” w pause_menu.
+        # Ruch postaci
+        if current_time >= next_move_time:
+            original_col, original_row = player_col, player_row
 
-        if time_accumulator >= 20000:
-            update_game_time(game_time, time_accumulator)
-            time_accumulator = 0
+            if keys_held[pygame.K_UP]:
+                player_row -= 1
+            if keys_held[pygame.K_DOWN]:
+                player_row += 1
+            if keys_held[pygame.K_LEFT]:
+                player_col -= 1
+            if keys_held[pygame.K_RIGHT]:
+                player_col += 1
 
-        # Rysowanie tła i elementów gry
+            # Kolizja z krawędziami
+            player_col = clamp(player_col, 0, MAP_SIZE - 1)
+            player_row = clamp(player_row, 0, MAP_SIZE - 1)
+
+            # Jeśli gracz faktycznie się ruszył
+            if (player_col, player_row) != (original_col, original_row):
+                engine.say(f"Przemieszczam się z pola {original_col}, {original_row} na pole {player_col}, {player_row}")
+                engine.runAndWait()
+                next_move_time = current_time + MOVE_COOLDOWN
+
+        # Rysowanie
         screen.fill((0, 0, 0))
-        draw_game_clock(screen, game_time)
+        draw_2d_grid(screen, offset_x, offset_y, (255, 255, 0))
+
+        # Rysujemy gracza
+        # Współrzędne pixeli gracza na ekranie
+        gx = offset_x + player_col * TILE_SIZE
+        gy = offset_y + player_row * TILE_SIZE
+
+        # Kwadrat 32x32 w kolorze białym
+        player_rect = pygame.Rect(gx, gy, TILE_SIZE, TILE_SIZE)
+        pygame.draw.rect(screen, (255, 255, 255), player_rect)
 
         pygame.display.flip()
+        clock.tick(60)
 
-if __name__ == "__main__":
-    # Inicjalizacja TTS
+# === Główna funkcja uruchamiająca całą grę ===
+def main():
     engine = initialize_tts()
-    # Inicjalizacja okna w trybie fullscreen
     screen = initialize_game()
 
-    # Wyświetlanie logo i tytułu
+    # Ekrany logo/tytuł
     show_logo(screen, engine)
     show_title(screen, engine)
 
-    # Przejście do menu głównego
-    selected_action = main_menu(screen, engine)
-    if selected_action == "new_game":
+    # Menu główne
+    action = main_menu(screen, engine)
+    if action == "new_game":
         show_introduction(screen, engine)
-        game_loop(screen, engine)
-    # W innych wypadkach można zdefiniować dalszą logikę (np. wczytanie gry).
+        topdown_game_loop(screen, engine)
+
+    pygame.quit()
+    sys.exit()
+
+if __name__ == "__main__":
+    main()
