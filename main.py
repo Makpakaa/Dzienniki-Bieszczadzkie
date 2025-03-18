@@ -53,6 +53,64 @@ def stop_tts():
     global stop_tts_flag
     stop_tts_flag = True
 
+#dodaje ekwipunek (inventory)
+from inventory import Inventory, inventory_open
+
+def main():
+    pygame.init()
+    screen = pygame.display.set_mode((800, 600))
+    clock = pygame.time.Clock()
+
+    # Tworzymy instancję ekwipunku
+    player_inventory = Inventory()
+
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_e:
+                    # Przełączamy stan inventory_open
+                    # (deklarujemy global, bo inventory_open jest zaimportowane z inventory.py)
+                    global inventory_open
+                    inventory_open = not inventory_open
+
+            # Jeśli ekwipunek jest otwarty, pozwól mu obsłużyć kliknięcia (mysz, klawiatura)
+            if inventory_open:
+                player_inventory.handle_event(event)
+
+        # LOGIKA GRY
+        if inventory_open:
+            # Jeśli ekwipunek jest otwarty, pauzujemy logikę świata
+            # Możesz wykonać update ekwipunku (np. sprawdzanie receptur craftingu)
+            player_inventory.update()
+        else:
+            # Normalna logika gry (poruszanie postaci, NPC, czas gry itp.)
+            pass
+
+        # RYSOWANIE
+        screen.fill((0, 0, 0))  # tło
+        if inventory_open:
+            # Rysujemy ekwipunek
+            player_inventory.draw(screen)
+        else:
+            # Rysujesz świat gry, postacie, HUD itp.
+            pass
+
+        pygame.display.flip()
+        clock.tick(60)
+
+    pygame.quit()
+
+
+# Start gry (nowa gra lub po wczytaniu zapisu)
+if __name__ == "__main__":
+    main()
+
+
+
 # === Funkcja inicjalizująca grę w trybie pełnoekranowym ===
 def initialize_game():
     pygame.init()
