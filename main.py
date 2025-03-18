@@ -1,19 +1,57 @@
 import pygame
 import sys
+import threading
 import pyttsx3
 
-# --- Ustawienia planszy 2D ---
+# --- Ustawienia ---
 TILE_SIZE = 32
-MAP_SIZE = 200  # mapa 200x200
-MOVE_COOLDOWN = 1  # co ile ms możemy wykonać kolejny krok przy przytrzymaniu klawisza
+MAP_SIZE = 200   # mapa 200x200
+MOVE_COOLDOWN = 100  # co ile ms można wykonać kolejny krok przy przytrzymaniu klawisza
 
-# === Funkcja inicjalizująca TTS ===
-def initialize_tts():
+# === Zmienne globalne dla TTS ===
+stop_tts_flag = False      # Flaga do przerwania mowy
+tts_running_flag = False   # Czy aktualnie trwa mówienie
+
+def tts_thread_function(text):
+    """
+    Funkcja wątku TTS.
+    Czyta podany tekst w kawałkach. Pozwala przerwać mówienie, jeśli stop_tts_flag = True.
+    """
+    global stop_tts_flag, tts_running_flag
+    tts_running_flag = True
+
     engine = pyttsx3.init()
-    # Możesz ustawić głośność, prędkość, itp.:
-    # engine.setProperty('rate', 150)
-    # engine.setProperty('volume', 1.0)
-    return engine
+    chunks = text.split(". ")  # dzielimy na krótsze zdania
+
+    for chunk in chunks:
+        if stop_tts_flag:
+            break
+        engine.say(chunk)
+        engine.runAndWait()
+        if stop_tts_flag:
+            break
+
+    engine.stop()
+    tts_running_flag = False
+    stop_tts_flag = False   # po zakończeniu mówienia resetujemy flagę
+
+def start_tts(text):
+    """
+    Uruchamia nowy wątek TTS z podanym tekstem, o ile nie trwa już mówienie.
+    """
+    global stop_tts_flag, tts_running_flag
+    # Jeśli TTS obecnie nie mówi, tworzymy nowy wątek.
+    if not tts_running_flag:
+        stop_tts_flag = False
+        t = threading.Thread(target=tts_thread_function, args=(text,))
+        t.start()
+
+def stop_tts():
+    """
+    Ustawia flagę przerwania mowy.
+    """
+    global stop_tts_flag
+    stop_tts_flag = True
 
 # === Funkcja inicjalizująca grę w trybie pełnoekranowym ===
 def initialize_game():
@@ -26,7 +64,7 @@ def initialize_game():
     return screen
 
 # === Wyświetlanie logo (przykład) ===
-def show_logo(screen, engine):
+def show_logo(screen):
     screen.fill((0, 0, 0))
     font = pygame.font.SysFont(None, 64)
     label_text = "LOGO GRY"
@@ -35,9 +73,10 @@ def show_logo(screen, engine):
     screen.blit(label, rect)
     pygame.display.flip()
 
-    engine.say("Wyświetlam logo gry. Naciśnij dowolny klawisz, aby przejść dalej.")
-    engine.runAndWait()
+    # Rozpoczynamy czytanie w osobnym wątku
+    start_tts("Wyświetlam logo gry. Naciśnij dowolny klawisz, aby przejść dalej.")
 
+    # Czekamy, aż użytkownik wciśnie klawisz lub minie pewien czas
     wait_duration = 3000  # ms
     start_time = pygame.time.get_ticks()
     waiting = True
@@ -48,12 +87,16 @@ def show_logo(screen, engine):
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
+                # Przerywamy TTS i przechodzimy dalej
+                stop_tts()
                 waiting = False
         if current_time - start_time >= wait_duration:
+            # Po 3 sekundach też przerywamy automatycznie
+            stop_tts()
             waiting = False
 
 # === Wyświetlanie tytułu (przykład) ===
-def show_title(screen, engine):
+def show_title(screen):
     screen.fill((0, 0, 0))
     font = pygame.font.SysFont(None, 100)
     title_text = "Dzienniki\nBieszczadzkie"
@@ -68,10 +111,9 @@ def show_title(screen, engine):
 
     pygame.display.flip()
 
-    engine.say("Dzienniki Bieszczadzkie. Naciśnij dowolny klawisz, aby przejść dalej.")
-    engine.runAndWait()
+    start_tts("Dzienniki Bieszczadzkie. Naciśnij dowolny klawisz, aby przejść dalej.")
 
-    wait_duration = 3000  # ms
+    wait_duration = 3000
     start_time = pygame.time.get_ticks()
     waiting = True
     while waiting:
@@ -81,19 +123,21 @@ def show_title(screen, engine):
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
+                stop_tts()
                 waiting = False
         if current_time - start_time >= wait_duration:
+            stop_tts()
             waiting = False
 
 # === Menu główne gry ===
-def main_menu(screen, engine):
+def main_menu(screen):
     running = True
     clock = pygame.time.Clock()
     selected_option = 0
     options = ["Nowa Gra", "Załaduj Grę", "Wyjście"]
 
-    engine.say("Menu główne. Użyj strzałek góra i dół, by wybrać opcję, Enter aby zatwierdzić.")
-    engine.runAndWait()
+    # TTS menu głównego
+    start_tts("Menu główne. Użyj strzałek góra i dół, by wybrać opcję, Enter aby zatwierdzić.")
 
     while running:
         for event in pygame.event.get():
@@ -103,20 +147,23 @@ def main_menu(screen, engine):
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_UP:
                     selected_option = (selected_option - 1) % len(options)
-                    engine.say(options[selected_option])
-                    engine.runAndWait()
+                    stop_tts()  # przerywamy poprzednią wypowiedź
+                    start_tts(options[selected_option])
                 elif event.key == pygame.K_DOWN:
                     selected_option = (selected_option + 1) % len(options)
-                    engine.say(options[selected_option])
-                    engine.runAndWait()
+                    stop_tts()
+                    start_tts(options[selected_option])
                 elif event.key == pygame.K_RETURN:
-                    engine.say(f"Wybrano opcję: {options[selected_option]}")
-                    engine.runAndWait()
+                    stop_tts()
+                    # Komunikat TTS z wybraną opcją
+                    start_tts(f"Wybrano opcję: {options[selected_option]}")
+                    # Poczekajmy krótką chwilę, żeby usłyszeć choć kawałek komunikatu
+                    pygame.time.delay(300)
+
                     if selected_option == 0:  # Nowa Gra
                         return "new_game"
                     elif selected_option == 1:  # Załaduj Grę (stub)
-                        engine.say("Załaduj Grę - opcja w przygotowaniu.")
-                        engine.runAndWait()
+                        start_tts("Załaduj Grę - opcja w przygotowaniu.")
                     elif selected_option == 2:  # Wyjście
                         pygame.quit()
                         sys.exit()
@@ -138,7 +185,7 @@ def main_menu(screen, engine):
         clock.tick(30)
 
 # === Wyświetlenie wprowadzenia (przykład) ===
-def show_introduction(screen, engine):
+def show_introduction(screen):
     screen.fill((0, 0, 0))
     font = pygame.font.SysFont(None, 36)
     intro_text = [
@@ -147,17 +194,16 @@ def show_introduction(screen, engine):
         "Twoim celem jest odkrycie tajemnic tej krainy.",
         "Powodzenia!"
     ]
-    tts_text = "\n".join(intro_text)
+    tts_text = ". ".join(intro_text)
 
     for i, line in enumerate(intro_text):
         label = font.render(line, True, (255, 255, 0))
         screen.blit(label, (50, 200 + i * 40))
     pygame.display.flip()
 
-    engine.say(tts_text + " Naciśnij dowolny klawisz, aby przejść dalej.")
-    engine.runAndWait()
+    start_tts(tts_text + ". Naciśnij dowolny klawisz, aby przejść dalej.")
 
-    wait_duration = 3000  # ms
+    wait_duration = 3000
     start_time = pygame.time.get_ticks()
     waiting = True
     while waiting:
@@ -167,17 +213,18 @@ def show_introduction(screen, engine):
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
+                stop_tts()
                 waiting = False
         if current_time - start_time >= wait_duration:
+            stop_tts()
             waiting = False
 
 # === Funkcja potwierdzająca wyjście z gry (z pauzy) ===
-def confirm_quit(screen, engine):
+def confirm_quit(screen):
     options = ["Tak", "Nie"]
     selected_option = 0
 
-    engine.say("Czy na pewno zapisałeś stan gry? Wybierz Tak lub Nie.")
-    engine.runAndWait()
+    start_tts("Czy na pewno zapisałeś stan gry? Wybierz Tak lub Nie.")
 
     clock = pygame.time.Clock()
     running = True
@@ -189,11 +236,12 @@ def confirm_quit(screen, engine):
             elif event.type == pygame.KEYDOWN:
                 if event.key in [pygame.K_UP, pygame.K_DOWN]:
                     selected_option = (selected_option + 1) % 2
-                    engine.say(options[selected_option])
-                    engine.runAndWait()
+                    stop_tts()
+                    start_tts(options[selected_option])
                 elif event.key == pygame.K_RETURN:
-                    engine.say(f"Wybrano: {options[selected_option]}")
-                    engine.runAndWait()
+                    stop_tts()
+                    start_tts(f"Wybrano: {options[selected_option]}")
+                    pygame.time.delay(300)  # krótkie opóźnienie
                     if selected_option == 0:
                         return "yes"
                     else:
@@ -221,12 +269,11 @@ def confirm_quit(screen, engine):
         clock.tick(30)
 
 # === Menu pauzy (w trakcie gry) ===
-def pause_menu(screen, engine):
+def pause_menu(screen):
     options = ["Wróć do gry", "Zapisz grę", "Wczytaj grę", "Ustawienia", "Wyjdź z gry"]
     selected_option = 0
 
-    engine.say("Menu pauzy. Użyj strzałek góra i dół, aby wybrać opcję, Enter aby zatwierdzić.")
-    engine.runAndWait()
+    start_tts("Menu pauzy. Użyj strzałek góra i dół, aby wybrać opcję, Enter aby zatwierdzić.")
 
     clock = pygame.time.Clock()
     paused = True
@@ -238,26 +285,24 @@ def pause_menu(screen, engine):
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_UP:
                     selected_option = (selected_option - 1) % len(options)
-                    engine.say(options[selected_option])
-                    engine.runAndWait()
+                    stop_tts()
+                    start_tts(options[selected_option])
                 elif event.key == pygame.K_DOWN:
                     selected_option = (selected_option + 1) % len(options)
-                    engine.say(options[selected_option])
-                    engine.runAndWait()
+                    stop_tts()
+                    start_tts(options[selected_option])
                 elif event.key == pygame.K_RETURN:
-                    engine.say(f"Wybrano: {options[selected_option]}")
-                    engine.runAndWait()
+                    stop_tts()
+                    start_tts(f"Wybrano: {options[selected_option]}")
+                    pygame.time.delay(300)
                     if selected_option == 0:  # Wróć do gry
                         return "resume"
                     elif selected_option == 1:  # Zapisz grę
-                        engine.say("Zapisz grę - opcja w przygotowaniu.")
-                        engine.runAndWait()
+                        start_tts("Zapisz grę - opcja w przygotowaniu.")
                     elif selected_option == 2:  # Wczytaj grę
-                        engine.say("Wczytaj grę - opcja w przygotowaniu.")
-                        engine.runAndWait()
+                        start_tts("Wczytaj grę - opcja w przygotowaniu.")
                     elif selected_option == 3:  # Ustawienia
-                        engine.say("Ustawienia - opcja w przygotowaniu.")
-                        engine.runAndWait()
+                        start_tts("Ustawienia - opcja w przygotowaniu.")
                     elif selected_option == 4:  # Wyjdź z gry
                         return "quit"
 
@@ -302,7 +347,7 @@ def clamp(value, min_val, max_val):
     return max(min_val, min(value, max_val))
 
 # === Pętla gry 2D (top-down) ===
-def topdown_game_loop(screen, engine):
+def topdown_game_loop(screen):
     """
     Plansza 200x200. Każda kratka 32x32.
     Gracz startuje w środku (100,100),
@@ -321,7 +366,6 @@ def topdown_game_loop(screen, engine):
     screen_width, screen_height = screen.get_size()
 
     # Ustawiamy offset tak, by gracz był w środku ekranu
-    # player_col * TILE_SIZE daje pikselową pozycję gracza
     offset_x = screen_width // 2 - (player_col * TILE_SIZE)
     offset_y = screen_height // 2 - (player_row * TILE_SIZE)
 
@@ -345,11 +389,11 @@ def topdown_game_loop(screen, engine):
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     # Menu pauzy
-                    action = pause_menu(screen, engine)
+                    action = pause_menu(screen)
                     if action == "resume":
                         pass
                     elif action == "quit":
-                        confirm = confirm_quit(screen, engine)
+                        confirm = confirm_quit(screen)
                         if confirm == "yes":
                             running = False
                 if event.key in keys_held:
@@ -377,8 +421,9 @@ def topdown_game_loop(screen, engine):
 
             # Jeśli gracz faktycznie się ruszył
             if (player_col, player_row) != (original_col, original_row):
-                engine.say(f"Przemieszczam się z pola {original_col}, {original_row} na pole {player_col}, {player_row}")
-                engine.runAndWait()
+                # Komunikat w osobnym wątku
+                stop_tts()  # Przerywamy ewentualne poprzednie
+                start_tts(f"Przemieszczam się z pola {original_col}, {original_row} na pole {player_col}, {player_row}")
                 next_move_time = current_time + MOVE_COOLDOWN
 
         # Rysowanie
@@ -386,11 +431,8 @@ def topdown_game_loop(screen, engine):
         draw_2d_grid(screen, offset_x, offset_y, (255, 255, 0))
 
         # Rysujemy gracza
-        # Współrzędne pixeli gracza na ekranie
         gx = offset_x + player_col * TILE_SIZE
         gy = offset_y + player_row * TILE_SIZE
-
-        # Kwadrat 32x32 w kolorze białym
         player_rect = pygame.Rect(gx, gy, TILE_SIZE, TILE_SIZE)
         pygame.draw.rect(screen, (255, 255, 255), player_rect)
 
@@ -399,18 +441,17 @@ def topdown_game_loop(screen, engine):
 
 # === Główna funkcja uruchamiająca całą grę ===
 def main():
-    engine = initialize_tts()
     screen = initialize_game()
 
     # Ekrany logo/tytuł
-    show_logo(screen, engine)
-    show_title(screen, engine)
+    show_logo(screen)
+    show_title(screen)
 
     # Menu główne
-    action = main_menu(screen, engine)
+    action = main_menu(screen)
     if action == "new_game":
-        show_introduction(screen, engine)
-        topdown_game_loop(screen, engine)
+        show_introduction(screen)
+        topdown_game_loop(screen)
 
     pygame.quit()
     sys.exit()
