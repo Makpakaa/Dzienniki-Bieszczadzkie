@@ -18,25 +18,6 @@ class Seed:
         self.fruit_duration = fruit_duration  # Czas trwania owocowania (w dniach)
 
 
-# Definicja klasy Seed
-class Seed:
-    def __init__(self, seed_id, growth_days, yield_range, sell_price, quantity=1, name=None, yield_name=None,
-                 yield_frequency=None, max_harvests=None, is_perennial=False, fruiting_season=None,
-                 max_fruits_per_day=None, fruit_duration=None):
-        self.seed_id = seed_id
-        self.growth_days = growth_days
-        self.yield_range = yield_range
-        self.sell_price = sell_price
-        self.quantity = quantity
-        self.name = name or f"Nasiono {seed_id}"
-        self.yield_name = yield_name or f"Plon {seed_id}"
-        self.yield_frequency = yield_frequency  # Dni między zbiorami (dla wielokrotnych zbiorów)
-        self.max_harvests = max_harvests  # Maksymalna liczba zbiorów
-        self.is_perennial = is_perennial  # Czy roślina jest wieloletnia
-        self.fruiting_season = fruiting_season  # Sezon owocowania (dla drzew owocowych)
-        self.max_fruits_per_day = max_fruits_per_day  # Maks. liczba owoców dziennie
-        self.fruit_duration = fruit_duration  # Czas trwania owocowania (w dniach)
-
 # Klasa zarządzająca roślinami
 class PlantsManager:
     def __init__(self):
