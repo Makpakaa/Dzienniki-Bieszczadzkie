@@ -6,7 +6,7 @@ import pyttsx3
 # --- Ustawienia ---
 TILE_SIZE = 32
 MAP_SIZE = 200   # mapa 200x200
-MOVE_COOLDOWN = 100  # co ile ms można wykonać kolejny krok przy przytrzymaniu klawisza
+MOVE_COOLDOWN = 300  # co ile ms można wykonać kolejny krok przy przytrzymaniu klawisza
 
 # === Zmienne globalne dla TTS ===
 stop_tts_flag = False      # Flaga do przerwania mowy
@@ -54,72 +54,21 @@ def stop_tts():
     stop_tts_flag = True
 
 #dodaje ekwipunek (inventory)
-from inventory import Inventory, inventory_open
-
-def main():
-    pygame.init()
-    screen = pygame.display.set_mode((800, 600))
-    clock = pygame.time.Clock()
-
-    # Tworzymy instancję ekwipunku
-    player_inventory = Inventory()
-
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_e:
-                    # Przełączamy stan inventory_open
-                    # (deklarujemy global, bo inventory_open jest zaimportowane z inventory.py)
-                    global inventory_open
-                    inventory_open = not inventory_open
-
-            # Jeśli ekwipunek jest otwarty, pozwól mu obsłużyć kliknięcia (mysz, klawiatura)
-            if inventory_open:
-                player_inventory.handle_event(event)
-
-        # LOGIKA GRY
-        if inventory_open:
-            # Jeśli ekwipunek jest otwarty, pauzujemy logikę świata
-            # Możesz wykonać update ekwipunku (np. sprawdzanie receptur craftingu)
-            player_inventory.update()
-        else:
-            # Normalna logika gry (poruszanie postaci, NPC, czas gry itp.)
-            pass
-
-        # RYSOWANIE
-        screen.fill((0, 0, 0))  # tło
-        if inventory_open:
-            # Rysujemy ekwipunek
-            player_inventory.draw(screen)
-        else:
-            # Rysujesz świat gry, postacie, HUD itp.
-            pass
-
-        pygame.display.flip()
-        clock.tick(60)
-
-    pygame.quit()
-
-
-# Start gry (nowa gra lub po wczytaniu zapisu)
-if __name__ == "__main__":
-    main()
-
-
+from inventory import update, draw, inventory_open, handle_tab_navigation
 
 # === Funkcja inicjalizująca grę w trybie pełnoekranowym ===
+from inventory import init_font
+
 def initialize_game():
     pygame.init()
+    init_font()
     info = pygame.display.Info()
     screen_width = info.current_w
     screen_height = info.current_h
     screen = pygame.display.set_mode((screen_width, screen_height), pygame.FULLSCREEN)
     pygame.display.set_caption("Dzienniki Bieszczadzkie - Widok 2D")
     return screen
+
 
 # === Wyświetlanie logo (przykład) ===
 def show_logo(screen):
@@ -404,6 +353,10 @@ def draw_2d_grid(screen, offset_x, offset_y, color=(255, 255, 0)):
 def clamp(value, min_val, max_val):
     return max(min_val, min(value, max_val))
 
+
+
+
+
 # === Pętla gry 2D (top-down) ===
 def topdown_game_loop(screen):
     """
@@ -437,16 +390,23 @@ def topdown_game_loop(screen):
     }
 
     running = True
+
+    global inventory_open
+    inventory_open = False
+
     while running:
         current_time = pygame.time.get_ticks()
+
+
+
 
         # Obsługa zdarzeń
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            elif event.type == pygame.KEYDOWN:
+
+            if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    # Menu pauzy
                     action = pause_menu(screen)
                     if action == "resume":
                         pass
@@ -454,14 +414,22 @@ def topdown_game_loop(screen):
                         confirm = confirm_quit(screen)
                         if confirm == "yes":
                             running = False
+
+                elif event.key == pygame.K_e:
+                    inventory_open = not inventory_open
+                    if inventory_open:
+                        start_tts("Otwieram ekwipunek")
+                    else:
+                        start_tts("Zamykam ekwipunek")
+
                 if event.key in keys_held:
                     keys_held[event.key] = True
-            elif event.type == pygame.KEYUP:
+
+            if event.type == pygame.KEYUP:
                 if event.key in keys_held:
                     keys_held[event.key] = False
 
-        # Ruch postaci
-        if current_time >= next_move_time:
+        if not inventory_open and current_time >= next_move_time:
             original_col, original_row = player_col, player_row
 
             if keys_held[pygame.K_UP]:
@@ -473,26 +441,28 @@ def topdown_game_loop(screen):
             if keys_held[pygame.K_RIGHT]:
                 player_col += 1
 
-            # Kolizja z krawędziami
             player_col = clamp(player_col, 0, MAP_SIZE - 1)
             player_row = clamp(player_row, 0, MAP_SIZE - 1)
 
-            # Jeśli gracz faktycznie się ruszył
             if (player_col, player_row) != (original_col, original_row):
-                # Komunikat w osobnym wątku
-                stop_tts()  # Przerywamy ewentualne poprzednie
+                stop_tts()
                 start_tts(f"Przemieszczam się z pola {original_col}, {original_row} na pole {player_col}, {player_row}")
                 next_move_time = current_time + MOVE_COOLDOWN
 
         # Rysowanie
         screen.fill((0, 0, 0))
-        draw_2d_grid(screen, offset_x, offset_y, (255, 255, 0))
 
-        # Rysujemy gracza
-        gx = offset_x + player_col * TILE_SIZE
-        gy = offset_y + player_row * TILE_SIZE
-        player_rect = pygame.Rect(gx, gy, TILE_SIZE, TILE_SIZE)
-        pygame.draw.rect(screen, (255, 255, 255), player_rect)
+        if inventory_open:
+            update()
+            draw(screen)
+        else:
+            draw_2d_grid(screen, offset_x, offset_y, (255, 255, 0))
+
+            gx = offset_x + player_col * TILE_SIZE
+            gy = offset_y + player_row * TILE_SIZE
+            player_rect = pygame.Rect(gx, gy, TILE_SIZE, TILE_SIZE)
+            pygame.draw.rect(screen, (255, 255, 255), player_rect)
+
 
         pygame.display.flip()
         clock.tick(60)
@@ -510,6 +480,8 @@ def main():
     if action == "new_game":
         show_introduction(screen)
         topdown_game_loop(screen)
+
+
 
     pygame.quit()
     sys.exit()
