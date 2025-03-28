@@ -446,8 +446,12 @@ def topdown_game_loop(screen):
 
             if (player_col, player_row) != (original_col, original_row):
                 stop_tts()
-                start_tts(f"Przemieszczam się z pola {original_col}, {original_row} na pole {player_col}, {player_row}")
+                start_tts(f"Przechodzę na {player_col}, {player_row}")
                 next_move_time = current_time + MOVE_COOLDOWN
+
+        # Aktualizacja widoku
+        offset_x = screen_width // 2 - (player_col * TILE_SIZE)
+        offset_y = screen_height // 2 - (player_row * TILE_SIZE)
 
         # Rysowanie
         screen.fill((0, 0, 0))
