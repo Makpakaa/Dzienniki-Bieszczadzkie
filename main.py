@@ -2,6 +2,7 @@ import pygame
 import sys
 import threading
 import pyttsx3
+import inventory
 
 # --- Ustawienia ---
 TILE_SIZE = 32
@@ -53,15 +54,10 @@ def stop_tts():
     global stop_tts_flag
     stop_tts_flag = True
 
-#dodaje ekwipunek (inventory)
-from inventory import update, draw, inventory_open, handle_tab_navigation
-
 # === Funkcja inicjalizująca grę w trybie pełnoekranowym ===
-from inventory import init_font
-
 def initialize_game():
     pygame.init()
-    init_font()
+    inventory.init_font()
     info = pygame.display.Info()
     screen_width = info.current_w
     screen_height = info.current_h
@@ -359,14 +355,6 @@ def clamp(value, min_val, max_val):
 
 # === Pętla gry 2D (top-down) ===
 def topdown_game_loop(screen):
-    """
-    Plansza 200x200. Każda kratka 32x32.
-    Gracz startuje w środku (100,100),
-    ruch strzałkami, 1 kratka na naciśnięcie/przytrzymanie.
-    ESC = menu pauzy.
-    Znacznik gracza: kwadrat 32x32 w kolorze białym.
-    Syntezator informuje o ruchu z (col,row) na (col2,row2).
-    """
     clock = pygame.time.Clock()
 
     # Pozycja startowa gracza (środek planszy)
@@ -390,15 +378,11 @@ def topdown_game_loop(screen):
     }
 
     running = True
-
-    global inventory_open
-    inventory_open = False
+    # Ustawiamy ekwipunek na domyślnie zamknięty
+    inventory.inventory_open = False
 
     while running:
         current_time = pygame.time.get_ticks()
-
-
-
 
         # Obsługa zdarzeń
         for event in pygame.event.get():
@@ -407,7 +391,13 @@ def topdown_game_loop(screen):
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    action = pause_menu(screen)
+                    if inventory.inventory_open:
+                        # TYLKO zamykamy ekwipunek:
+                        inventory.inventory_open = False
+                        start_tts("Zamykam ekwipunek")
+                    else:
+                        # Gdy ekwipunek jest zamknięty, wtedy faktycznie otwieramy menu pauzy:
+                        action = pause_menu(screen)
                     if action == "resume":
                         pass
                     elif action == "quit":
@@ -416,8 +406,9 @@ def topdown_game_loop(screen):
                             running = False
 
                 elif event.key == pygame.K_e:
-                    inventory_open = not inventory_open
-                    if inventory_open:
+                    # Tutaj faktycznie przełączamy ekwipunek
+                    inventory.inventory_open = not inventory.inventory_open
+                    if inventory.inventory_open:
                         start_tts("Otwieram ekwipunek")
                     else:
                         start_tts("Zamykam ekwipunek")
@@ -429,7 +420,8 @@ def topdown_game_loop(screen):
                 if event.key in keys_held:
                     keys_held[event.key] = False
 
-        if not inventory_open and current_time >= next_move_time:
+        # Jeśli ekwipunek jest zamknięty i mamy czas na ruch, to obsługujemy ruch postaci
+        if not inventory.inventory_open and current_time >= next_move_time:
             original_col, original_row = player_col, player_row
 
             if keys_held[pygame.K_UP]:
@@ -441,6 +433,7 @@ def topdown_game_loop(screen):
             if keys_held[pygame.K_RIGHT]:
                 player_col += 1
 
+            # Granice mapy
             player_col = clamp(player_col, 0, MAP_SIZE - 1)
             player_row = clamp(player_row, 0, MAP_SIZE - 1)
 
@@ -456,9 +449,9 @@ def topdown_game_loop(screen):
         # Rysowanie
         screen.fill((0, 0, 0))
 
-        if inventory_open:
-            update()
-            draw(screen)
+        if inventory.inventory_open:
+            inventory.update()
+            inventory.draw(screen)
         else:
             draw_2d_grid(screen, offset_x, offset_y, (255, 255, 0))
 
@@ -467,9 +460,9 @@ def topdown_game_loop(screen):
             player_rect = pygame.Rect(gx, gy, TILE_SIZE, TILE_SIZE)
             pygame.draw.rect(screen, (255, 255, 255), player_rect)
 
-
         pygame.display.flip()
         clock.tick(60)
+
 
 # === Główna funkcja uruchamiająca całą grę ===
 def main():
