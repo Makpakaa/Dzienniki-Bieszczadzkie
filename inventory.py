@@ -131,30 +131,46 @@ def update():
     pass
 
 def draw_inventory(screen):
-    """
-    Rysuje ekwipunek na ekranie:
-      - Nazwa sekcji
-      - Lista elementów sekcji
-      - Podświetlenie wybranego elementu
-    """
     screen.fill(BG_COLOR)
 
-    section_name = SECTIONS[selected_section]
-    title_text = f"Ekwipunek - {section_name}"
+    # Tytuł ogólny
+    title_text = "Ekwipunek (wszystkie sekcje)"
     title_label = FONT.render(title_text, True, HEADER_COLOR)
     screen.blit(title_label, (50, 20))
 
-    items = get_section_items(selected_section)
-    y = 80
-    for i, item_text in enumerate(items):
-        color = TEXT_COLOR
-        if i == selected_item_index:
-            color = (255, 255, 255)  # biały do podświetlenia
-        label = FONT.render(item_text, True, color)
-        screen.blit(label, (50, y))
-        y += (FONT_SIZE + 6)
+    # Szerokość każdej kolumny
+    column_width = 300
+    # Górny margines tekstu
+    top_margin = 80
+
+    for section_idx, section_name in enumerate(SECTIONS):
+        # Obliczamy X kolumny: przesunięcie co column_width od lewej
+        x = 50 + section_idx * column_width
+        y = top_margin
+
+        # Rysujemy nazwę sekcji
+        name_label = FONT.render(section_name, True, HEADER_COLOR)
+        screen.blit(name_label, (x, y))
+        y += FONT_SIZE + 6
+
+        # Pobieramy listę przedmiotów z danej sekcji
+        items = get_section_items(section_idx)
+
+        # Rysujemy każdy przedmiot
+        for i, item_text in enumerate(items):
+            # Jeśli ta sekcja i indeks pasują do naszego wybranego elementu,
+            # to wyróżnijmy go kolorem białym:
+            if section_idx == selected_section and i == selected_item_index:
+                color = (255, 255, 255)
+            else:
+                color = TEXT_COLOR
+
+            label = FONT.render(item_text, True, color)
+            screen.blit(label, (x + 20, y))
+            y += (FONT_SIZE + 4)
 
     pygame.display.flip()
+
 
 def draw(screen):
     """

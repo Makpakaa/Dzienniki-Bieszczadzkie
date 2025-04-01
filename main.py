@@ -393,11 +393,9 @@ def topdown_game_loop(screen):
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     if inventory.inventory_open:
-                        # TYLKO zamykamy ekwipunek:
                         inventory.inventory_open = False
                         start_tts("Zamykam ekwipunek")
                     else:
-                        # Gdy ekwipunek jest zamknięty, wtedy faktycznie otwieramy menu pauzy:
                         action = pause_menu(screen)
                     if action == "resume":
                         pass
@@ -407,7 +405,6 @@ def topdown_game_loop(screen):
                             running = False
 
                 elif event.key == pygame.K_e:
-                    # Tutaj faktycznie przełączamy ekwipunek
                     inventory.inventory_open = not inventory.inventory_open
                     if inventory.inventory_open:
                         start_tts("Otwieram ekwipunek")
@@ -421,7 +418,9 @@ def topdown_game_loop(screen):
                 if event.key in keys_held:
                     keys_held[event.key] = False
 
-        # Jeśli ekwipunek jest zamknięty i mamy czas na ruch, to obsługujemy ruch postaci
+        if inventory.inventory_open:
+            inventory.handle_inventory_navigation(event)
+
         if not inventory.inventory_open and current_time >= next_move_time:
             original_col, original_row = player_col, player_row
 
