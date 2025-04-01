@@ -355,6 +355,7 @@ def clamp(value, min_val, max_val):
 
 # === Pętla gry 2D (top-down) ===
 def topdown_game_loop(screen):
+    action = None
     clock = pygame.time.Clock()
 
     # Pozycja startowa gracza (środek planszy)
