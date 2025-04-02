@@ -5,7 +5,7 @@ import pyttsx3
 import inventory
 
 # --- Ustawienia ---
-TILE_SIZE = 32
+TILE_SIZE = 16
 MAP_SIZE = 200   # mapa 200x200
 MOVE_COOLDOWN = 300  # co ile ms można wykonać kolejny krok przy przytrzymaniu klawisza
 

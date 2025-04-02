@@ -20,6 +20,7 @@ gear_equipped = [None] * len(gear_slots)
 accessory_slots_unlocked = False
 accessory_slots = [None, None, None, None]  # np. 2 pierścienie, 2 amulety
 
+BACKPACK_CAPACITY = 10
 backpack_items = [("Kilof", 12), ("Pochodnia", 34), ("Ziemniak", 3)]
 quick_slots = [None] * 9
 
@@ -62,8 +63,15 @@ def get_section_items(section_idx):
         else:
             return ["Dodatki zablokowane"]
     elif section_name == "Ekwipunek":
-        # Z krotek ("Kilof", 12) tworzymy "Kilof (12)"
-        return [f"{name} ({count})" for (name, count) in backpack_items]
+        # Konwersja istniejących przedmiotów do formatu tekstowego "Kilof (12)"
+        items_in_backpack = [f"{name} ({count})" for (name, count) in backpack_items]
+
+        # Uzupełniamy puste miejsca do pojemności
+        while len(items_in_backpack) < BACKPACK_CAPACITY:
+            items_in_backpack.append("(puste miejsce)")
+
+        return items_in_backpack
+
     elif section_name == "Podręczne":
         return [f"{i+1}: {slot or '(puste)'}"
                 for i, slot in enumerate(quick_slots)]
