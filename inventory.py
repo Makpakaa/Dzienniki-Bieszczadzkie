@@ -25,6 +25,16 @@ backpack_items = [("Kilof", 12), ("Pochodnia", 34), ("Ziemniak", 3)]
 quick_slots = [None] * 9
 
 # === Stan nawigacji w ekwipunku ===
+
+# === Stan trybu interakcji ===
+inventory_mode = "browse"  # browse, submenu, moving
+sub_menu_open = False
+sub_menu_options = ["Przenieś", "Upuść"]
+selected_sub_menu_option = 0
+
+moving_item = None
+moving_item_source = None  # (sekcja, indeks)
+
 inventory_open = False
 selected_section = 0
 selected_item_index = 0
@@ -93,18 +103,9 @@ def speak_current_item():
     speak(items[selected_item_index])
 
 def handle_inventory_navigation(event):
-    """
-    Obsługa klawiszy, gdy ekwipunek jest otwarty:
-      - Strzałka góra/dół: nawigacja po elementach aktualnej sekcji.
-      - Strzałka lewo/prawo: przełączanie się między sekcjami.
-      - Enter: prosta akcja (np. 'Używam').
-      - Zamknięcie ekwipunku obsługujesz w main.py (np. klawisz E lub ESC).
-    """
     global selected_section, selected_item_index
-
     items = get_section_items(selected_section)
     max_index = len(items) - 1
-
     if event.type == pygame.KEYDOWN:
         if event.key == pygame.K_UP:
             if max_index >= 0:
@@ -124,11 +125,14 @@ def handle_inventory_navigation(event):
             selected_item_index = 0
             speak(SECTIONS[selected_section])
             speak_current_item()
-        elif event.key == pygame.K_RETURN:
-            if items and 0 <= selected_item_index < len(items):
-                speak(f"Używam: {items[selected_item_index]}")
-            else:
-                speak("Brak elementu do użycia.")
+elif event.key == pygame.K_RETURN:
+    items = get_section_items(selected_section)
+    if items and 0 <= selected_item_index < len(items):
+        inventory_mode = "submenu"
+        sub_menu_open = True
+        selected_sub_menu_option = 0
+        speak("Opcje: Przenieś lub Upuść. Użyj strzałek góra i dół, Enter aby zatwierdzić.")
+
 
 def update():
     """
