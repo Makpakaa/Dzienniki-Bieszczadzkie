@@ -3,6 +3,9 @@ import sys
 import threading
 import pyttsx3
 import inventory
+import container
+import shop
+import world
 
 # --- Ustawienia ---
 TILE_SIZE = 16
@@ -14,27 +17,27 @@ stop_tts_flag = False      # Flaga do przerwania mowy
 tts_running_flag = False   # Czy aktualnie trwa mówienie
 
 def tts_thread_function(text):
-    """
-    Funkcja wątku TTS.
-    Czyta podany tekst w kawałkach. Pozwala przerwać mówienie, jeśli stop_tts_flag = True.
-    """
     global stop_tts_flag, tts_running_flag
     tts_running_flag = True
 
-    engine = pyttsx3.init()
-    chunks = text.split(". ")  # dzielimy na krótsze zdania
+    try:
+        engine = pyttsx3.init()
+        chunks = text.split(". ")
 
-    for chunk in chunks:
-        if stop_tts_flag:
-            break
-        engine.say(chunk)
-        engine.runAndWait()
-        if stop_tts_flag:
-            break
+        for chunk in chunks:
+            if stop_tts_flag:
+                break
+            engine.say(chunk)
+            engine.runAndWait()
+            if stop_tts_flag:
+                break
 
-    engine.stop()
+        engine.stop()
+    except RuntimeError:
+        pass  # Silnik już działa – ignorujemy błąd
+
     tts_running_flag = False
-    stop_tts_flag = False   # po zakończeniu mówienia resetujemy flagę
+    stop_tts_flag = False
 
 def start_tts(text):
     """
@@ -358,6 +361,17 @@ def topdown_game_loop(screen):
     action = None
     clock = pygame.time.Clock()
 
+    # 🛑 ← tutaj WSTAW to:
+
+    chest = container.Container("Skrzynia", capacity=10)
+    chest.add_item("Złoty pierścień", 1)
+    chest.add_item("Kurtka", 1)
+
+    village_shop = shop.Shop("Sklep wiejski")
+    village_shop.add_item("Kilof", 1, 150)
+    village_shop.add_item("Ziemniak", 5, 5)
+    village_shop.add_item("Chleb", 2, 10)
+
     # Pozycja startowa gracza (środek planszy)
     player_col = 100
     player_row = 100
@@ -391,6 +405,14 @@ def topdown_game_loop(screen):
                 running = False
 
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN or event.key == pygame.K_KP_ENTER:
+                    # Tutaj sprawdzimy, co jest przed graczem
+                    # Na razie robimy test: zawsze otwierajmy skrzynię
+                    inventory.container_items = chest.items  # chest będzie naszym przykładowym kontenerem
+                    inventory.inventory_open = True
+                    inventory.selected_section = 0
+                    inventory.selected_item_index = 0
+                    start_tts("Otwieram skrzynię lub sklep.")
                 if event.key == pygame.K_ESCAPE:
                     if inventory.inventory_open:
                         inventory.inventory_open = False
@@ -454,6 +476,12 @@ def topdown_game_loop(screen):
             inventory.draw(screen)
         else:
             draw_2d_grid(screen, offset_x, offset_y, (255, 255, 0))
+            # Rysuj upuszczone przedmioty
+            for item in world.dropped_items:
+                item_x = offset_x + item.x * TILE_SIZE
+                item_y = offset_y + item.y * TILE_SIZE
+                item_rect = pygame.Rect(item_x, item_y, TILE_SIZE, TILE_SIZE)
+                pygame.draw.rect(screen, (0, 255, 0), item_rect)  # zielony kwadrat
 
             gx = offset_x + player_col * TILE_SIZE
             gy = offset_y + player_row * TILE_SIZE
