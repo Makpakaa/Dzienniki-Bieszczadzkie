@@ -1,3 +1,4 @@
+
 import pygame
 import sys
 import threading
@@ -7,13 +8,11 @@ import container
 import shop
 import world
 
-# --- Ustawienia ---
 TILE_SIZE = 16
 MAP_SIZE = 200   # mapa 200x200
 MOVE_COOLDOWN = 300  # co ile ms można wykonać kolejny krok przy przytrzymaniu klawisza
 
-# === Zmienne globalne dla TTS ===
-stop_tts_flag = False      # Flaga do przerwania mowy
+#top_tts_flag = False      # Flaga do przerwania mowy
 tts_running_flag = False   # Czy aktualnie trwa mówienie
 
 def tts_thread_function(text):
@@ -40,20 +39,13 @@ def tts_thread_function(text):
     stop_tts_flag = False
 
 def start_tts(text):
-    """
-    Uruchamia nowy wątek TTS z podanym tekstem, o ile nie trwa już mówienie.
-    """
     global stop_tts_flag, tts_running_flag
-    # Jeśli TTS obecnie nie mówi, tworzymy nowy wątek.
     if not tts_running_flag:
         stop_tts_flag = False
         t = threading.Thread(target=tts_thread_function, args=(text,))
         t.start()
 
 def stop_tts():
-    """
-    Ustawia flagę przerwania mowy.
-    """
     global stop_tts_flag
     stop_tts_flag = True
 
@@ -82,7 +74,6 @@ def show_logo(screen):
     # Rozpoczynamy czytanie w osobnym wątku
     start_tts("Wyświetlam logo gry. Naciśnij dowolny klawisz, aby przejść dalej.")
 
-    # Czekamy, aż użytkownik wciśnie klawisz lub minie pewien czas
     wait_duration = 3000  # ms
     start_time = pygame.time.get_ticks()
     waiting = True
@@ -93,15 +84,12 @@ def show_logo(screen):
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
-                # Przerywamy TTS i przechodzimy dalej
                 stop_tts()
                 waiting = False
         if current_time - start_time >= wait_duration:
-            # Po 3 sekundach też przerywamy automatycznie
             stop_tts()
             waiting = False
 
-# === Wyświetlanie tytułu (przykład) ===
 def show_title(screen):
     screen.fill((0, 0, 0))
     font = pygame.font.SysFont(None, 100)
@@ -145,7 +133,7 @@ def main_menu(screen):
     # TTS menu głównego
     start_tts("Menu główne. Użyj strzałek góra i dół, by wybrać opcję, Enter aby zatwierdzić.")
 
-    while running:
+        while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -361,8 +349,6 @@ def topdown_game_loop(screen):
     action = None
     clock = pygame.time.Clock()
 
-    # 🛑 ← tutaj WSTAW to:
-
     chest = container.Container("Skrzynia", capacity=10)
     chest.add_item("Złoty pierścień", 1)
     chest.add_item("Kurtka", 1)
@@ -393,11 +379,26 @@ def topdown_game_loop(screen):
     }
 
     running = True
+
     # Ustawiamy ekwipunek na domyślnie zamknięty
     inventory.inventory_open = False
 
+    # Ustawienia pozycji NPC i skrzyni
+    npc_col = 98
+    npc_row = 100
+    chest_col = 102
+    chest_row = 100
+
     while running:
         current_time = pygame.time.get_ticks()
+
+        def check_for_interaction(player_col, player_row):
+            if abs(player_col - npc_col) <= 1 and player_row == npc_row:
+                return "npc"
+            elif abs(player_col - chest_col) <= 1 and player_row == chest_row:
+                return "chest"
+            else:
+                return None
 
         # Obsługa zdarzeń
         for event in pygame.event.get():
@@ -406,25 +407,21 @@ def topdown_game_loop(screen):
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN or event.key == pygame.K_KP_ENTER:
-                    # Tutaj sprawdzimy, co jest przed graczem
-                    # Na razie robimy test: zawsze otwierajmy skrzynię
-                    inventory.container_items = chest.items  # chest będzie naszym przykładowym kontenerem
-                    inventory.inventory_open = True
-                    inventory.selected_section = 0
-                    inventory.selected_item_index = 0
-                    start_tts("Otwieram skrzynię lub sklep.")
-                if event.key == pygame.K_ESCAPE:
-                    if inventory.inventory_open:
-                        inventory.inventory_open = False
-                        start_tts("Zamykam ekwipunek")
+                    interaction = check_for_interaction(player_col, player_row)
+                    if interaction == "npc":
+                        inventory.container_items = village_shop.items_for_sale
+                        inventory.inventory_open = True
+                        inventory.selected_section = 0
+                        inventory.selected_item_index = 0
+                        start_tts("Rozpoczynam handel.")
+                    elif interaction == "chest":
+                        inventory.container_items = chest.items
+                        inventory.inventory_open = True
+                        inventory.selected_section = 0
+                        inventory.selected_item_index = 0
+                        start_tts("Otwieram skrzynię.")
                     else:
-                        action = pause_menu(screen)
-                    if action == "resume":
-                        pass
-                    elif action == "quit":
-                        confirm = confirm_quit(screen)
-                        if confirm == "yes":
-                            running = False
+                        start_tts("Tutaj nic nie ma.")
 
                 elif event.key == pygame.K_e:
                     inventory.inventory_open = not inventory.inventory_open
@@ -476,6 +473,19 @@ def topdown_game_loop(screen):
             inventory.draw(screen)
         else:
             draw_2d_grid(screen, offset_x, offset_y, (255, 255, 0))
+
+            # Rysuj NPC
+            npc_x = offset_x + npc_col * TILE_SIZE
+            npc_y = offset_y + npc_row * TILE_SIZE
+            npc_rect = pygame.Rect(npc_x, npc_y, TILE_SIZE, TILE_SIZE)
+            pygame.draw.rect(screen, (0, 0, 255), npc_rect)
+
+            # Rysuj skrzynię
+            chest_x = offset_x + chest_col * TILE_SIZE
+            chest_y = offset_y + chest_row * TILE_SIZE
+            chest_rect = pygame.Rect(chest_x, chest_y, TILE_SIZE, TILE_SIZE)
+            pygame.draw.rect(screen, (139, 69, 19), chest_rect)
+
             # Rysuj upuszczone przedmioty
             for item in world.dropped_items:
                 item_x = offset_x + item.x * TILE_SIZE
@@ -491,25 +501,17 @@ def topdown_game_loop(screen):
         pygame.display.flip()
         clock.tick(60)
 
-
-# === Główna funkcja uruchamiająca całą grę ===
 def main():
     screen = initialize_game()
 
-    # Ekrany logo/tytuł
     show_logo(screen)
     show_title(screen)
 
-    # Menu główne
     action = main_menu(screen)
     if action == "new_game":
         show_introduction(screen)
         topdown_game_loop(screen)
-
-
-
     pygame.quit()
     sys.exit()
-
 if __name__ == "__main__":
     main()
