@@ -1,6 +1,5 @@
-# inventory.py
 import pygame
-import pyttsx3
+import tts
 
 # === Stałe i zasoby ===
 FONT_SIZE = 24
@@ -31,18 +30,6 @@ selected_item_index = 0
 moving_item = None
 moving_item_source = None  # (sekcja, indeks)
 
-# Inicjalizacja TTS
-engine = pyttsx3.init()
-
-def speak(text):
-    try:
-        engine.stop()
-        engine.say(text)
-        engine.runAndWait()
-    except RuntimeError:
-        # Silnik już działa -> ignorujemy błąd
-        pass
-
 def init_font():
     global FONT
     FONT = pygame.font.SysFont(None, FONT_SIZE)
@@ -58,12 +45,12 @@ def get_section_items(section_idx):
 def speak_current_item():
     items = get_section_items(selected_section)
     if not items:
-        speak("Brak elementów.")
+        tts.speak("Brak elementów.")
         return
     if selected_item_index < 0 or selected_item_index >= len(items):
-        speak("Poza zakresem listy.")
+        tts.speak("Poza zakresem listy.")
         return
-    speak(items[selected_item_index])
+    tts.speak(items[selected_item_index])
 
 def handle_inventory_navigation(event):
     global selected_section, selected_item_index
@@ -78,7 +65,7 @@ def handle_inventory_navigation(event):
             if event.key == pygame.K_TAB:
                 selected_section = (selected_section + 1) % 2
                 selected_item_index = 0
-                speak(SECTIONS[selected_section])
+                tts.speak(SECTIONS[selected_section])
                 speak_current_item()
             elif event.key == pygame.K_UP:
                 if max_index >= 0:
@@ -93,27 +80,27 @@ def handle_inventory_navigation(event):
                     inventory_mode = "submenu"
                     sub_menu_open = True
                     selected_sub_menu_option = 0
-                    speak("Opcje: Użyj, Przenieś, Upuść, Właściwości. Strzałki góra/dół, Enter zatwierdza.")
+                    tts.speak("Opcje: Użyj, Przenieś, Upuść, Właściwości. Strzałki góra dół, Enter zatwierdza.")
 
         elif inventory_mode == "submenu":
             if event.key == pygame.K_UP:
                 selected_sub_menu_option = (selected_sub_menu_option - 1) % len(sub_menu_options)
-                speak(sub_menu_options[selected_sub_menu_option])
+                tts.speak(sub_menu_options[selected_sub_menu_option])
             elif event.key == pygame.K_DOWN:
                 selected_sub_menu_option = (selected_sub_menu_option + 1) % len(sub_menu_options)
-                speak(sub_menu_options[selected_sub_menu_option])
+                tts.speak(sub_menu_options[selected_sub_menu_option])
             elif event.key == pygame.K_ESCAPE:
                 inventory_mode = "browse"
                 sub_menu_open = False
-                speak("Anulowano.")
+                tts.speak("Anulowano.")
             elif event.key == pygame.K_RETURN or event.key == pygame.K_KP_ENTER:
                 chosen_option = sub_menu_options[selected_sub_menu_option]
                 if not items or selected_item_index >= len(items):
-                    speak("Nieprawidłowy wybór.")
+                    tts.speak("Nieprawidłowy wybór.")
                     return
 
                 if chosen_option == "Użyj":
-                    speak(f"Używasz: {items[selected_item_index]}")
+                    tts.speak(f"Używasz: {items[selected_item_index]}")
                     inventory_mode = "browse"
                     sub_menu_open = False
 
@@ -122,18 +109,18 @@ def handle_inventory_navigation(event):
                     moving_item_source = (selected_section, selected_item_index)
                     inventory_mode = "moving"
                     sub_menu_open = False
-                    speak(f"Przenoszę {moving_item}. Wybierz miejsce docelowe i naciśnij Enter.")
+                    tts.speak(f"Przenoszę {moving_item}. Wybierz miejsce docelowe i naciśnij Enter.")
 
                 elif chosen_option == "Upuść":
                     import world
-                    player_x, player_y = 100, 100  # przykładowa pozycja gracza
+                    player_x, player_y = 100, 100  # przykładowa pozycja
                     world.drop_item("Ziemniak", 1, player_x, player_y, "right")
-                    speak(f"Upuszczono: {items[selected_item_index]}")
+                    tts.speak(f"Upuszczono: {items[selected_item_index]}")
                     inventory_mode = "browse"
                     sub_menu_open = False
 
                 elif chosen_option == "Właściwości":
-                    speak(f"Właściwości: {items[selected_item_index]}")
+                    tts.speak(f"Właściwości: {items[selected_item_index]}")
                     inventory_mode = "browse"
                     sub_menu_open = False
 
