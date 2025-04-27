@@ -210,6 +210,15 @@ def topdown_game_loop(screen):
             if event.type == pygame.QUIT:
                 running = False
 
+        if inventory.inventory_open:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    inventory.inventory_open = False
+                    tts.speak("Zamykam ekwipunek")
+                else:
+                    inventory.handle_inventory_navigation(event)
+            continue
+
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN or event.key == pygame.K_KP_ENTER:
                     if abs(player_col - npc_col) <= 1 and player_row == npc_row:
@@ -240,9 +249,6 @@ def topdown_game_loop(screen):
             if event.type == pygame.KEYUP:
                 if event.key in keys_held:
                     keys_held[event.key] = False
-
-        if inventory.inventory_open:
-            inventory.handle_inventory_navigation(event)
 
         if not inventory.inventory_open and current_time >= next_move_time:
             original_col, original_row = player_col, player_row
