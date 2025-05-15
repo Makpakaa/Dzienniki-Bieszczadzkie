@@ -1,11 +1,20 @@
 import pygame
 import sys
 import threading
-import tts
-import inventory
-import container
-import shop
-import world
+from game import tts
+from game import inventory
+from game import container
+from game import shop
+from game import world
+from game import map
+from game import quest
+from game import npc
+from game import plants
+from game import animals
+from game import building
+from game import clothing
+from game import player
+from game import tools
 
 TILE_SIZE = 16
 MAP_SIZE = 200
