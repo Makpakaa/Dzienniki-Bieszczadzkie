@@ -1,6 +1,9 @@
+import os
 import pygame
-import sys
 from dzienniki.audio import tts
+from dzienniki import settings
+from dzienniki.entities.player import Player
+from dzienniki.utils.loader import load_image
 
 def show_logo(screen):
     screen.fill((0, 0, 0))
@@ -37,10 +40,7 @@ def show_title(screen):
             return
 
 def main_menu(screen):
-    """Pokazuje menu główne z wyborem opcji klawiszami i TTS."""
-    import pygame
-    from dzienniki.audio import tts
-
+    """Pokazuje menu główne z wyborem opcji i TTS."""
     options = ["Nowa Gra", "Załaduj Grę", "Wyjście"]
     selected = 0
     clock = pygame.time.Clock()
@@ -63,27 +63,26 @@ def main_menu(screen):
                     pygame.time.delay(300)
                     return options[selected].lower().replace(" ", "_")
 
-        # Rysowanie menu
         screen.fill((0, 0, 0))
         font = pygame.font.SysFont(None, 48)
         for i, opt in enumerate(options):
-            color = (255,255,255) if i == selected else (255,255,0)
+            color = (255, 255, 255) if i == selected else (255, 255, 0)
             lbl = font.render(opt, True, color)
             x = screen.get_width()//2 - lbl.get_width()//2
             y = 200 + i*60
-            screen.blit(lbl, (x,y))
+            screen.blit(lbl, (x, y))
             if i == selected:
-                pygame.draw.rect(screen, color,
-                                 (x-5, y-5, lbl.get_width()+10, lbl.get_height()+10), 2)
+                pygame.draw.rect(
+                    screen, color,
+                    (x-5, y-5, lbl.get_width()+10, lbl.get_height()+10),
+                    2
+                )
 
         pygame.display.flip()
         clock.tick(30)
 
 def show_introduction(screen):
     """Pokazuje tekst wprowadzający grę z TTS."""
-    import pygame
-    from dzienniki.audio import tts
-
     lines = [
         "Witamy w Dziennikach Bieszczadzkich!",
         "Jesteś wędrowcem przemierzającym wzgórza i doliny.",
@@ -100,7 +99,6 @@ def show_introduction(screen):
     pygame.display.flip()
 
     tts.speak(tts_text + " Naciśnij dowolny klawisz, aby kontynuować.")
-
     start = pygame.time.get_ticks()
     while True:
         for e in pygame.event.get():
@@ -110,30 +108,54 @@ def show_introduction(screen):
             return
 
 def topdown_game_loop(screen):
-    """Prosta, czarna pętla gry; tu wstawisz właściwą logikę."""
-    import pygame
-    from dzienniki import settings
+    """Prosta pętla gry z obsługą gracza i mapy kafelkowej."""
+    clock       = pygame.time.Clock()
+    player      = Player()
+    all_sprites = pygame.sprite.Group(player)
 
-    clock = pygame.time.Clock()
+    # — fallbackowa mapa kafelkowa —
+    tile_img = load_image(os.path.join("tiles", "grass.png"))
+    map_path = os.path.join(settings.ASSETS_DIR, "map.txt")
+    try:
+        with open(map_path, "r", encoding="utf-8") as f:
+            map_rows = [list(line.strip()) for line in f if line.strip()]
+    except FileNotFoundError:
+        cols = settings.SCREEN_WIDTH  // settings.TILE_SIZE
+        rows = settings.SCREEN_HEIGHT // settings.TILE_SIZE
+        map_rows = [["g"] * cols for _ in range(rows)]
+    # ——————————————————————————————
+
     running = True
-
     while running:
-        # delta_time w sekundach
-        dt = clock.tick( settings.FPS ) / 1000.0
+        dt = clock.tick(settings.FPS) / 1000.0
 
-        # obsługa zdarzeń
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            if event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
                 running = False
 
-        # rysowanie tła
-        screen.fill((0, 0, 0))
+        # rysujemy mapę kafelkową
+        for ry, row in enumerate(map_rows):
+            for cx, cell in enumerate(row):
+                if cell == "g":
+                    screen.blit(tile_img, (cx*settings.TILE_SIZE, ry*settings.TILE_SIZE))
 
-        # TODO: tutaj zostanie logika ruchu, rysowania świata itd.
+        # zaznaczenie kafelka przed graczem
+        col = player.rect.centerx // settings.TILE_SIZE
+        row = player.rect.centery  // settings.TILE_SIZE
+        if player.facing == "up":    row -= 1
+        if player.facing == "down":  row += 1
+        if player.facing == "left":  col -= 1
+        if player.facing == "right": col += 1
+        if 0 <= row < len(map_rows) and 0 <= col < len(map_rows[0]):
+            pygame.draw.rect(
+                screen, (255, 255, 0),
+                (col*settings.TILE_SIZE, row*settings.TILE_SIZE,
+                 settings.TILE_SIZE, settings.TILE_SIZE),
+                2
+            )
 
+        all_sprites.update(dt)
+        all_sprites.draw(screen)
         pygame.display.flip()
 
-    # wyjście z pętli
     return
