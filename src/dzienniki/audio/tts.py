@@ -15,24 +15,29 @@ class TTSManager:
             if text is None:
                 break
             try:
-                self.engine.stop()  # natychmiast przerywaj poprzednie mówienie
+                # przerwij poprzednie mówienie
+                self.engine.stop()
                 self.engine.say(text)
                 self.engine.runAndWait()
             except RuntimeError:
-                pass  # jeżeli engine został zamknięty, ignoruj błędy
+                pass
 
-    def speak(self, text):
+    def speak(self, text: str):
         """Dodaje tekst do kolejki do przeczytania."""
         self.queue.put(text)
 
     def stop(self):
-        """Zatrzymuje silnik TTS i kończy wątek."""
-        self.running = False
-        self.queue.put(None)
-        self.engine.stop()
+        """Przerwij bieżące czytanie i wyrzuć wszystkie oczekujące komunikaty."""
+        try:
+            self.engine.stop()
+        except RuntimeError:
+            pass
+        with self.queue.mutex:
+            self.queue.queue.clear()
 
-# Tworzymy globalną instancję TTSManager
+# globalna instancja
 manager = TTSManager()
 
-# Udostępniamy skrót funkcji speak() dla łatwego użycia
+# eksportowane skróty
 speak = manager.speak
+stop  = manager.stop
