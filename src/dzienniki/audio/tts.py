@@ -1,43 +1,28 @@
 import pyttsx3
-import threading
-from queue import Queue
 
 class TTSManager:
     def __init__(self):
         self.engine = pyttsx3.init()
-        self.queue = Queue()
-        self.running = True
-        threading.Thread(target=self._worker, daemon=True).start()
-
-    def _worker(self):
-        while self.running:
-            text = self.queue.get()
-            if text is None:
-                break
-            try:
-                # przerwij poprzednie mówienie
-                self.engine.stop()
-                self.engine.say(text)
-                self.engine.runAndWait()
-            except RuntimeError:
-                pass
+        # podbij tempo, ale bez przesady (domyślnie ~200)
+        rate = self.engine.getProperty("rate")
+        self.engine.setProperty("rate", min(rate + 100, 350))
 
     def speak(self, text: str):
-        """Dodaje tekst do kolejki do przeczytania."""
-        self.queue.put(text)
+        """Blokująco przeczytaj cały tekst."""
+        # przerwij co się czyta
+        self.engine.stop()
+        # powiedz i czekaj na zakończenie
+        self.engine.say(text)
+        self.engine.runAndWait()
 
     def stop(self):
-        """Przerwij bieżące czytanie i wyrzuć wszystkie oczekujące komunikaty."""
+        """Przerwij mowę (gdyby coś było w trakcie)."""
         try:
             self.engine.stop()
-        except RuntimeError:
+        except Exception:
             pass
-        with self.queue.mutex:
-            self.queue.queue.clear()
 
 # globalna instancja
 manager = TTSManager()
-
-# eksportowane skróty
 speak = manager.speak
 stop  = manager.stop
