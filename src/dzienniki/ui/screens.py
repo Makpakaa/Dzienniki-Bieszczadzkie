@@ -1,19 +1,16 @@
 import os
 import pygame
-from dzienniki.audio.tts import speak, stop
-from dzienniki.audio.tts import manager
+from dzienniki.audio.tts import speak, stop, manager
 from dzienniki import settings
 from dzienniki.entities.player import Player
-from dzienniki.utils.loader import load_image
 
 def speak_now(text: str):
-    """Powiedz tekst blokująco, czekając na zakończenie mowy."""
+    """Blokujące TTS używane w ekranach startowych."""
     manager.engine.stop()
     manager.engine.say(text)
     manager.engine.runAndWait()
 
 def show_logo(screen):
-    """Logo — do 5 s lub do naciśnięcia, TTS mówi 'Logo.'"""
     screen.fill((0, 0, 0))
     font = pygame.font.SysFont(None, 64)
     label = font.render("LOGO GRY", True, (255, 255, 0))
@@ -21,22 +18,18 @@ def show_logo(screen):
     screen.blit(label, rect)
     pygame.display.flip()
 
-    stop()
-    speak("Logo.")
+    speak_now("Logo.")
     clock = pygame.time.Clock()
     start = pygame.time.get_ticks()
     while True:
         for e in pygame.event.get():
             if e.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN, pygame.QUIT):
-                stop()
                 return
         if pygame.time.get_ticks() - start >= 5000:
-            stop()
             return
         clock.tick(30)
 
 def show_title(screen):
-    """Tytuł — do 5 s lub do naciśnięcia, TTS mówi 'Dzienniki Bieszczadzkie.'"""
     screen.fill((0, 0, 0))
     font = pygame.font.SysFont(None, 100)
     lines = ["Dzienniki", "Bieszczadzkie"]
@@ -49,56 +42,42 @@ def show_title(screen):
         screen.blit(lbl, r)
     pygame.display.flip()
 
-    stop()
-    speak("Dzienniki Bieszczadzkie.")
+    speak_now("Dzienniki Bieszczadzkie.")
     clock = pygame.time.Clock()
     start = pygame.time.get_ticks()
     while True:
         for e in pygame.event.get():
             if e.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN, pygame.QUIT):
-                stop()
                 return
         if pygame.time.get_ticks() - start >= 5000:
-            stop()
             return
         clock.tick(30)
 
 def main_menu(screen):
-    """Menu główne z blokującym TTS: strzałki wybierają, Enter zatwierdza."""
     options = ["Nowa Gra", "Załaduj Grę", "Wyjście"]
     selected = 0
     clock = pygame.time.Clock()
-
-    # Włącz powtarzanie klawiszy (dłuższe przytrzymanie → kolejne KEYDOWN)
     pygame.key.set_repeat(300, 100)
 
-    # Powiedz instrukcję i pierwszą opcję, blokująco
-    stop()
-    speak("Menu główne. Strzałki góra, dół. Enter zatwierdza.")
-    speak(options[selected])
+    speak_now("Menu główne. Strzałki góra, dół. Enter zatwierdza.")
+    speak_now(options[selected])
 
     while True:
         for e in pygame.event.get():
             if e.type == pygame.QUIT:
-                stop()
                 return None
-
             if e.type == pygame.KEYDOWN:
                 if e.key == pygame.K_UP:
                     selected = (selected - 1) % len(options)
-                    speak(options[selected])
-
+                    speak_now(options[selected])
                 elif e.key == pygame.K_DOWN:
                     selected = (selected + 1) % len(options)
-                    speak(options[selected])
-
+                    speak_now(options[selected])
                 elif e.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
-                    speak(f"Wybrano: {options[selected]}")
+                    speak_now(f"Wybrano: {options[selected]}")
                     pygame.time.delay(300)
                     return options[selected].lower().replace(" ", "_")
-                # inne klawisze ignorujemy
 
-        # Rysowanie menu
         screen.fill((0, 0, 0))
         font = pygame.font.SysFont(None, 48)
         for i, opt in enumerate(options):
@@ -113,12 +92,10 @@ def main_menu(screen):
                     (x-5, y-5, lbl.get_width()+10, lbl.get_height()+10),
                     2
                 )
-
         pygame.display.flip()
         clock.tick(settings.FPS)
 
 def show_introduction(screen):
-    """Wprowadzenie — TTS czyta, dowolny klawisz przerywa."""
     lines = [
         "Witamy w Dziennikach Bieszczadzkich!",
         "Jesteś wędrowcem przemierzającym wzgórza i doliny.",
@@ -134,75 +111,111 @@ def show_introduction(screen):
         screen.blit(lbl, (50, 150 + i*40))
     pygame.display.flip()
 
-    stop()
-    speak(tts_text + " Naciśnij dowolny klawisz, aby kontynuować.")
+    speak_now(tts_text + " Naciśnij dowolny klawisz, aby kontynuować.")
     while True:
         for e in pygame.event.get():
             if e.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN, pygame.QUIT):
-                stop()
                 return
 
 def topdown_game_loop(screen):
-    """Główna pętla gry: KEYDOWN = kierunek, KEYUP = nazwa terenu."""
     clock = pygame.time.Clock()
     player = Player()
-    all_sprites = pygame.sprite.Group(player)
+    size = settings.TILE_SIZE
 
-    tile = load_image(os.path.join("tiles", "grass.png"))
+    # wczytanie mapy
     path = os.path.join(settings.ASSETS_DIR, "map.txt")
     try:
         with open(path, "r", encoding="utf-8") as f:
             map_rows = [list(line.strip()) for line in f if line.strip()]
     except FileNotFoundError:
-        cols = settings.SCREEN_WIDTH // settings.TILE_SIZE
-        rows = settings.SCREEN_HEIGHT // settings.TILE_SIZE
+        map_rows = []
+
+    # gdy brak lub pusta mapa, wypełnij trawą
+    if not map_rows or not map_rows[0]:
+        cols = settings.SCREEN_WIDTH // size
+        rows = settings.SCREEN_HEIGHT // size
         map_rows = [["g"] * cols for _ in range(rows)]
 
-    names = {"g": "trawa", "w": "woda"}
+    # umieść kamień po lewej, wodę po prawej (4 bloki od startu)
+    max_row = len(map_rows) - 1
+    max_col = len(map_rows[0]) - 1
+    start_col = (settings.SCREEN_WIDTH // 2) // size
+    start_row = (settings.SCREEN_HEIGHT // 2) // size
+    left_col = max(0, start_col - 4)
+    right_col = min(max_col, start_col + 4)
+    if 0 <= start_row <= max_row:
+        map_rows[start_row][left_col]  = 's'
+        map_rows[start_row][right_col] = 'w'
+
+    # — placeholderowe kafelki —
+    grass_tile = pygame.Surface((size, size)); grass_tile.fill((34, 139, 34))
+    water_tile = pygame.Surface((size, size)); water_tile.fill((0, 0, 255))
+    stone_tile = pygame.Surface((size, size)); stone_tile.fill((128, 128, 128))
+
+    # kolizje i nazwy do TTS
+    passable = {'g': True, 'w': False, 's': False}
+    names    = {'g': "trawa", 'w': "woda", 's': "kamień"}
+
+    last_dir = None
 
     while True:
         dt = clock.tick(settings.FPS) / 1000.0
 
         for e in pygame.event.get():
+            # wyjście
             if e.type == pygame.QUIT or (e.type == pygame.KEYDOWN and e.key == pygame.K_ESCAPE):
                 return
 
-            # KEYDOWN → kierunek
+            # na KEYDOWN ustaw kierunek
             if e.type == pygame.KEYDOWN and e.key in (
                 pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT
             ):
-                stop()
-                if e.key == pygame.K_UP:
-                    player.facing = "north";  speak("północ")
-                elif e.key == pygame.K_DOWN:
-                    player.facing = "south";  speak("południe")
-                elif e.key == pygame.K_LEFT:
-                    player.facing = "west";   speak("zachód")
-                elif e.key == pygame.K_RIGHT:
-                    player.facing = "east";   speak("wschód")
+                if e.key == pygame.K_UP:    last_dir = "północ"
+                elif e.key == pygame.K_DOWN: last_dir = "południe"
+                elif e.key == pygame.K_LEFT: last_dir = "zachód"
+                elif e.key == pygame.K_RIGHT:last_dir = "wschód"
 
-            # KEYUP → zawsze nazwa terenu przed graczem
-            if e.type == pygame.KEYUP and e.key in (
+            # na KEYUP: sprawdzenie bloku, ruch i TTS z koordynatami
+            elif e.type == pygame.KEYUP and e.key in (
                 pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT
             ):
-                all_sprites.update(dt)
-                col = player.rect.centerx // settings.TILE_SIZE
-                row = player.rect.centery // settings.TILE_SIZE
-                if player.facing == "north": row -= 1
-                elif player.facing == "south": row += 1
-                elif player.facing == "west":  col -= 1
-                elif player.facing == "east":  col += 1
+                # oblicz docelową kratkę
+                col = player.rect.centerx // size
+                row = player.rect.centery  // size
+                if last_dir == "północ":    row -= 1
+                elif last_dir == "południe":row += 1
+                elif last_dir == "zachód":  col -= 1
+                elif last_dir == "wschód":  col += 1
 
-                if 0 <= row < len(map_rows) and 0 <= col < len(map_rows[0]):
-                    stop()
-                    speak(names.get(map_rows[row][col], "nieznany teren"))
+                # zabezpiecz indeksy
+                row = max(0, min(row, max_row))
+                col = max(0, min(col, max_col))
 
-        # rysowanie
-        all_sprites.update(dt)
+                cell    = map_rows[row][col]
+                terrain = names.get(cell, "nieznany teren")
+
+                # TTS zawsze wypowie blok i koordynaty
+                if not passable.get(cell, True):
+                    speak(f"{last_dir}. {terrain}. X:{col}, Y:{row}")
+                else:
+                    # przesuń o jedną kratkę
+                    player.rect.topleft = (col * size, row * size)
+                    speak(f"{last_dir}. {terrain}. X:{col}, Y:{row}")
+
+                last_dir = None
+
+        # rysowanie mapy i gracza
         screen.fill((0, 0, 0))
-        for ry, row in enumerate(map_rows):
-            for cx, cell in enumerate(row):
+        for ry, row_data in enumerate(map_rows):
+            for cx, cell in enumerate(row_data):
                 if cell == "g":
-                    screen.blit(tile, (cx * settings.TILE_SIZE, ry * settings.TILE_SIZE))
-        all_sprites.draw(screen)
+                    screen.blit(grass_tile, (cx * size, ry * size))
+                elif cell == "w":
+                    screen.blit(water_tile, (cx * size, ry * size))
+                elif cell == "s":
+                    screen.blit(stone_tile, (cx * size, ry * size))
+                else:
+                    screen.blit(grass_tile, (cx * size, ry * size))
+
+        screen.blit(player.image, player.rect)
         pygame.display.flip()
