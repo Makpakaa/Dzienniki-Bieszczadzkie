@@ -26,3 +26,26 @@ def load_sound(name: str) -> pygame.mixer.Sound:
         class Silent:
             def play(self, *args, **kwargs): pass
         return Silent()
+
+
+def load_icons_from_folder(relative_path):
+    """
+    Ładuje wszystkie pliki PNG z folderu i zwraca słownik:
+    {'nazwa_pliku_bez_rozszerzenia': pygame.Surface}
+    """
+    import glob
+    icon_dict = {}
+
+    folder = os.path.join("assets", "images", relative_path)
+    files = glob.glob(os.path.join(folder, "*.png"))
+
+    for path in files:
+        name = os.path.splitext(os.path.basename(path))[0]
+        try:
+            icon = pygame.image.load(path).convert_alpha()
+            icon_dict[name] = icon
+        except Exception as e:
+            print(f"❌ Nie udało się załadować {path}: {e}")
+
+    print(f"✔️ Załadowano {len(icon_dict)} ikon z {relative_path}")
+    return icon_dict
