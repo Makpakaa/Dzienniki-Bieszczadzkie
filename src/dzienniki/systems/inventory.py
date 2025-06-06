@@ -1,5 +1,6 @@
 import pygame
-import tts
+from dzienniki.audio import tts
+from dzienniki.systems.item import Item
 
 # === Stałe i zasoby ===
 FONT_SIZE = 24
@@ -10,14 +11,30 @@ BG_COLOR = (30, 30, 30)
 HEADER_COLOR = (255, 255, 0)
 
 # Sekcje ekwipunku
-SECTIONS = ["Ekwipunek", "Skrzynia/Sklep"]
+SECTIONS = ["Ubiór", "Ekwipunek", "Podręczne"]
+
+# Pojemność plecaka (może się zmieniać w grze)
+BACKPACK_CAPACITY = 30
 
 # Ekwipunek gracza
-BACKPACK_CAPACITY = 30
-backpack_items = [("Kilof", 12), ("Pochodnia", 34), ("Ziemniak", 3)]
+backpack_items = [
+    Item(name="Kilof", count=1, item_type="tool"),
+    Item(name="Pochodnia", count=3, item_type="tool"),
+    Item(name="Ziemniak", count=5, item_type="food"),
+]
 
-# Tymczasowy ekwipunek kontenera lub sklepu
-container_items = [("Kurtka", 1), ("Chleb", 5)]
+# Sloty ubioru
+equipment_slots = {
+    "head": None,
+    "torso": None,
+    "hands": None,
+    "legs": None,
+    "feet": None,
+    "back": None
+}
+
+# Podręczne przedmioty 1–9
+quick_access_items = [None] * 9
 
 # Stan ekwipunku
 inventory_open = False
@@ -25,7 +42,7 @@ inventory_mode = "browse"  # browse, submenu, moving
 sub_menu_open = False
 sub_menu_options = ["Użyj", "Przenieś", "Upuść", "Właściwości"]
 selected_sub_menu_option = 0
-selected_section = 0  # 0 = gracz, 1 = kontener/sklep
+selected_section = 0  # 0 = Ubiór, 1 = Ekwipunek, 2 = Podręczne
 selected_item_index = 0
 moving_item = None
 moving_item_source = None  # (sekcja, indeks)
@@ -35,10 +52,26 @@ def init_font():
     FONT = pygame.font.SysFont(None, FONT_SIZE)
 
 def get_section_items(section_idx):
-    if section_idx == 0:
-        return [f"{name} ({count})" for (name, count) in backpack_items] + ["(puste miejsce)"] * (BACKPACK_CAPACITY - len(backpack_items))
-    elif section_idx == 1:
-        return [f"{name} ({count})" for (name, count) in container_items]
+    if section_idx == 0:  # Ubiór
+        result = []
+        for slot, item in equipment_slots.items():
+            if item:
+                result.append(f"Slot {slot}: {item.get_display_name()}, założone")
+            else:
+                result.append(f"Slot {slot}: (puste)")
+        return result
+    elif section_idx == 1:  # Ekwipunek
+        return [item.get_display_name() for item in backpack_items] + \
+               ["(puste miejsce)"] * (BACKPACK_CAPACITY - len(backpack_items))
+    elif section_idx == 2:  # Podręczne
+        result = []
+        for i in range(9):
+            item = quick_access_items[i]
+            if item:
+                result.append(f"{i+1}: {item.get_display_name()}")
+            else:
+                result.append(f"{i+1}: (puste)")
+        return result
     else:
         return []
 
@@ -50,7 +83,11 @@ def speak_current_item():
     if selected_item_index < 0 or selected_item_index >= len(items):
         tts.speak("Poza zakresem listy.")
         return
-    tts.speak(items[selected_item_index])
+
+    current = selected_item_index + 1
+    total = len(items)
+    text = items[selected_item_index]
+    tts.speak(f"{text}. Pozycja {current} z {total}.")
 
 def handle_inventory_navigation(event):
     global selected_section, selected_item_index
@@ -63,7 +100,7 @@ def handle_inventory_navigation(event):
     if event.type == pygame.KEYDOWN:
         if inventory_mode == "browse":
             if event.key == pygame.K_TAB:
-                selected_section = (selected_section + 1) % 2
+                selected_section = (selected_section + 1) % len(SECTIONS)
                 selected_item_index = 0
                 tts.speak(SECTIONS[selected_section])
                 speak_current_item()
@@ -113,7 +150,7 @@ def handle_inventory_navigation(event):
 
                 elif chosen_option == "Upuść":
                     import world
-                    player_x, player_y = 100, 100  # przykładowa pozycja
+                    player_x, player_y = 100, 100
                     world.drop_item("Ziemniak", 1, player_x, player_y, "right")
                     tts.speak(f"Upuszczono: {items[selected_item_index]}")
                     inventory_mode = "browse"
@@ -129,15 +166,14 @@ def update():
 
 def draw_inventory(screen):
     screen.fill(BG_COLOR)
-
-    title = "Ekwipunek - Przeciągnij przedmioty"
+    title = "Ekwipunek"
     label = FONT.render(title, True, HEADER_COLOR)
     screen.blit(label, (50, 20))
 
     column_width = 400
     margin_top = 80
 
-    for section_idx in range(2):
+    for section_idx in range(len(SECTIONS)):
         x = 50 + section_idx * column_width
         y = margin_top
         section_label = FONT.render(SECTIONS[section_idx], True, HEADER_COLOR)

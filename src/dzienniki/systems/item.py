@@ -9,7 +9,7 @@ class Item:
     item_type: str = "misc"  # np. 'tool', 'food', 'clothing'
     max_stack: int = 50
     equipped: bool = False
-    slot: Optional[str] = None  # np. 'head', 'torso', 'legs', itd.
+    slot: Optional[str] = None  # np. 'head', 'torso', 'legs'
 
     def is_stackable(self) -> bool:
         return self.max_stack > 1
