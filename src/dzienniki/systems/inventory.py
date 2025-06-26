@@ -38,7 +38,7 @@ selected_section = 1  # startowo ekwipunek
 selected_item_index = 0
 moving_item = None
 moving_item_source = None
-sort_mode = 0  # 0=A-Z, 1=Z-A, 2=ilość malejąco, 3=ilość rosnąco
+sort_mode = 0  # 0=A-Z, 1=Z-A, 2=ilość malejąco, 3=ilościowo rosnąco
 
 def init_font():
     global FONT
@@ -54,7 +54,7 @@ def get_section_items(section_idx):
                 result.append(f"Slot {slot}: (puste)")
         return result
     elif section_idx == 1:
-        items = backpack_items
+        items = list(backpack_items)
         if sort_mode == 0:
             items = sorted(items, key=lambda i: i.name.lower())
         elif sort_mode == 1:
@@ -63,19 +63,18 @@ def get_section_items(section_idx):
             items = sorted(items, key=lambda i: i.count, reverse=True)
         elif sort_mode == 3:
             items = sorted(items, key=lambda i: i.count)
-        return [item.get_display_name() for item in items] + \
-               ["(puste miejsce)"] * (BACKPACK_CAPACITY - len(backpack_items))
+        display = [item.get_display_name() for item in items]
+        display += ["(puste miejsce)"] * (BACKPACK_CAPACITY - len(backpack_items))
+        return display
     elif section_idx == 2:
         result = []
-        for i in range(9):
-            item = quick_access_items[i]
+        for idx, item in enumerate(quick_access_items):
             if item:
-                result.append(f"{i+1}: {item.get_display_name()}")
+                result.append(f"{idx+1}: {item.get_display_name()}")
             else:
-                result.append(f"{i+1}: (puste)")
+                result.append(f"{idx+1}: (puste)")
         return result
-    else:
-        return []
+    return []
 
 def speak_current_item():
     items = get_section_items(selected_section)
@@ -93,30 +92,31 @@ def speak_current_item():
 def get_selected_item():
     if selected_section == 0:
         keys = list(equipment_slots.keys())
-        slot = keys[selected_item_index] if selected_item_index < len(keys) else None
-        return equipment_slots.get(slot) if slot else None
+        if 0 <= selected_item_index < len(keys):
+            return equipment_slots[keys[selected_item_index]]
+        return None
     elif selected_section == 1:
-        if selected_item_index < len(backpack_items):
-            sorted_items = backpack_items
-            if sort_mode == 0:
-                sorted_items = sorted(backpack_items, key=lambda i: i.name.lower())
-            elif sort_mode == 1:
-                sorted_items = sorted(backpack_items, key=lambda i: i.name.lower(), reverse=True)
-            elif sort_mode == 2:
-                sorted_items = sorted(backpack_items, key=lambda i: i.count, reverse=True)
-            elif sort_mode == 3:
-                sorted_items = sorted(backpack_items, key=lambda i: i.count)
-            if selected_item_index < len(sorted_items):
-                return sorted_items[selected_item_index]
+        items = list(backpack_items)
+        if sort_mode == 0:
+            items = sorted(items, key=lambda i: i.name.lower())
+        elif sort_mode == 1:
+            items = sorted(items, key=lambda i: i.name.lower(), reverse=True)
+        elif sort_mode == 2:
+            items = sorted(items, key=lambda i: i.count, reverse=True)
+        elif sort_mode == 3:
+            items = sorted(items, key=lambda i: i.count)
+        if 0 <= selected_item_index < len(items):
+            return items[selected_item_index]
         return None
     elif selected_section == 2:
-        return quick_access_items[selected_item_index]
+        if 0 <= selected_item_index < len(quick_access_items):
+            return quick_access_items[selected_item_index]
     return None
 
 def build_sub_menu_options(item, section_idx):
     options = []
     if not item:
-        return []
+        return options
     if section_idx == 0:
         options.append("Zdejmij")
     elif section_idx == 1:
@@ -146,61 +146,111 @@ def handle_inventory_navigation(event):
     global inventory_mode, sub_menu_open, selected_sub_menu_option
     global moving_item, moving_item_source, sub_menu_options, sort_mode
 
-    items = get_section_items(selected_section)
-    max_index = len(items) - 1
+    if event.type != pygame.KEYDOWN:
+        return
 
-    if event.type == pygame.KEYDOWN:
-        if event.key == pygame.K_r and inventory_mode == "browse":
-            sort_mode = (sort_mode + 1) % 4
-            modes = ["A do Z", "Z do A", "ilościowo malejąco", "ilościowo rosnąco"]
-            tts.speak(f"Sortowanie: {modes[sort_mode]}")
-        elif inventory_mode == "browse":
-            if event.key == pygame.K_TAB and not pygame.key.get_mods() & pygame.KMOD_SHIFT:
-                selected_section = (selected_section + 1) % len(SECTIONS)
-                selected_item_index = 0
-                tts.speak(SECTIONS[selected_section])
-                speak_current_item()
-            elif event.key == pygame.K_TAB and pygame.key.get_mods() & pygame.KMOD_SHIFT:
-                selected_section = (selected_section - 1) % len(SECTIONS)
-                selected_item_index = 0
-                tts.speak(SECTIONS[selected_section])
-                speak_current_item()
-            elif event.key == pygame.K_UP:
+    key = event.key
+
+    # Tryb przenoszenia
+    if inventory_mode == "moving":
+        if key == pygame.K_ESCAPE:
+            inventory_mode = "browse"
+            moving_item = None
+            moving_item_source = None
+            tts.speak("Anulowano przenoszenie.")
+            return
+        if key == pygame.K_TAB and not pygame.key.get_mods() & pygame.KMOD_SHIFT:
+            selected_section = (selected_section + 1) % len(SECTIONS)
+            selected_item_index = 0
+            tts.speak(SECTIONS[selected_section])
+            speak_current_item()
+            return
+        if key == pygame.K_TAB and pygame.key.get_mods() & pygame.KMOD_SHIFT:
+            selected_section = (selected_section - 1) % len(SECTIONS)
+            selected_item_index = 0
+            tts.speak(SECTIONS[selected_section])
+            speak_current_item()
+            return
+        if key in (pygame.K_UP, pygame.K_DOWN):
+            items = get_section_items(selected_section)
+            max_index = len(items) - 1
+            if key == pygame.K_UP:
                 selected_item_index = (selected_item_index - 1) % (max_index + 1)
-                speak_current_item()
-            elif event.key == pygame.K_DOWN:
+            else:
                 selected_item_index = (selected_item_index + 1) % (max_index + 1)
-                speak_current_item()
-            elif event.key == pygame.K_SPACE:
-                item = get_selected_item()
-                if not item:
-                    tts.speak("Brak przedmiotu.")
-                    return
-                sub_menu_options.clear()
-                sub_menu_options.extend(build_sub_menu_options(item, selected_section))
-                if sub_menu_options:
-                    inventory_mode = "submenu"
-                    sub_menu_open = True
-                    selected_sub_menu_option = 0
-                    speak_current_submenu()
-                else:
-                    tts.speak("Brak dostępnych opcji.")
-        elif inventory_mode == "submenu":
-            if event.key == pygame.K_UP:
-                selected_sub_menu_option = (selected_sub_menu_option - 1) % len(sub_menu_options)
+            speak_current_item()
+            return
+        if key == pygame.K_RETURN:
+            confirm_move_target()
+        return
+
+    # Sortowanie w trybie browse
+    if inventory_mode == "browse" and key == pygame.K_r:
+        sort_mode = (sort_mode + 1) % 4
+        modes = ["A do Z", "Z do A", "ilościowo malejąco", "ilościowo rosnąco"]
+        tts.speak(f"Sortowanie: {modes[sort_mode]}")
+        return
+
+    # Nawigacja w browse
+    if inventory_mode == "browse":
+        if key == pygame.K_TAB and not pygame.key.get_mods() & pygame.KMOD_SHIFT:
+            selected_section = (selected_section + 1) % len(SECTIONS)
+            selected_item_index = 0
+            tts.speak(SECTIONS[selected_section])
+            speak_current_item()
+            return
+        if key == pygame.K_TAB and pygame.key.get_mods() & pygame.KMOD_SHIFT:
+            selected_section = (selected_section - 1) % len(SECTIONS)
+            selected_item_index = 0
+            tts.speak(SECTIONS[selected_section])
+            speak_current_item()
+            return
+        if key == pygame.K_UP:
+            items = get_section_items(selected_section)
+            max_index = len(items) - 1
+            selected_item_index = (selected_item_index - 1) % (max_index + 1)
+            speak_current_item()
+            return
+        if key == pygame.K_DOWN:
+            items = get_section_items(selected_section)
+            max_index = len(items) - 1
+            selected_item_index = (selected_item_index + 1) % (max_index + 1)
+            speak_current_item()
+            return
+        if key == pygame.K_SPACE:
+            item = get_selected_item()
+            if not item:
+                tts.speak("Brak przedmiotu.")
+                return
+            sub_menu_options.clear()
+            sub_menu_options.extend(build_sub_menu_options(item, selected_section))
+            if sub_menu_options:
+                inventory_mode = "submenu"
+                sub_menu_open = True
+                selected_sub_menu_option = 0
                 speak_current_submenu()
-            elif event.key == pygame.K_DOWN:
-                selected_sub_menu_option = (selected_sub_menu_option + 1) % len(sub_menu_options)
-                speak_current_submenu()
-            elif event.key == pygame.K_RETURN:
-                execute_submenu_action()
-            elif event.key == pygame.K_ESCAPE:
-                inventory_mode = "browse"
-                sub_menu_open = False
-                tts.speak("Anulowano.")
-        elif inventory_mode == "moving":
-            if event.key == pygame.K_RETURN:
-                confirm_move_target()
+            else:
+                tts.speak("Brak dostępnych opcji.")
+        return
+
+    # Nawigacja w submenu
+    if inventory_mode == "submenu":
+        if key == pygame.K_UP:
+            selected_sub_menu_option = (selected_sub_menu_option - 1) % len(sub_menu_options)
+            speak_current_submenu()
+            return
+        if key == pygame.K_DOWN:
+            selected_sub_menu_option = (selected_sub_menu_option + 1) % len(sub_menu_options)
+            speak_current_submenu()
+            return
+        if key == pygame.K_RETURN:
+            execute_submenu_action()
+            return
+        if key == pygame.K_ESCAPE:
+            inventory_mode = "browse"
+            sub_menu_open = False
+            tts.speak("Anulowano.")
+        return
 
 def execute_submenu_action():
     global inventory_mode, sub_menu_open, moving_item, moving_item_source
@@ -221,12 +271,12 @@ def execute_submenu_action():
             item.equipped = True
             if item in backpack_items:
                 backpack_items.remove(item)
-            elif item in quick_access_items:
-                for i in range(len(quick_access_items)):
-                    if quick_access_items[i] == item:
-                        quick_access_items[i] = None
-                        break
+            for i in range(len(quick_access_items)):
+                if quick_access_items[i] == item:
+                    quick_access_items[i] = None
             tts.speak(f"Założono: {item.name}")
+        inventory_mode = "browse"
+        sub_menu_open = False
 
     elif option == "Zdejmij":
         keys = list(equipment_slots.keys())
@@ -237,9 +287,13 @@ def execute_submenu_action():
             tts.speak("Zdjęto przedmiot.")
         else:
             tts.speak("Slot był pusty.")
+        inventory_mode = "browse"
+        sub_menu_open = False
 
     elif option == "Użyj":
         tts.speak(f"Użyto: {item.name}")
+        inventory_mode = "browse"
+        sub_menu_open = False
 
     elif option == "Przenieś":
         moving_item = item
@@ -250,12 +304,13 @@ def execute_submenu_action():
 
     elif option == "Upuść":
         tts.speak(f"Upuszczono: {item.name}")
+        inventory_mode = "browse"
+        sub_menu_open = False
 
     elif option == "Właściwości":
         tts.speak(f"Przedmiot: {item.name}, ilość: {item.count}")
-
-    inventory_mode = "browse"
-    sub_menu_open = False
+        inventory_mode = "browse"
+        sub_menu_open = False
 
 def confirm_move_target():
     global inventory_mode, moving_item, moving_item_source
@@ -291,7 +346,7 @@ def confirm_move_target():
         equipment_slots[slot] = moving_item
         moving_item.equipped = True
 
-    # usuwanie z poprzedniego miejsca
+    # usuwanie z miejsca źródłowego
     src_section, src_index = moving_item_source
     if src_section == 1 and src_index < len(backpack_items):
         del backpack_items[src_index]
@@ -308,8 +363,7 @@ def confirm_move_target():
 
 def draw_inventory(screen):
     screen.fill(BG_COLOR)
-    title = "Ekwipunek postaci"
-    label = FONT.render(title, True, HEADER_COLOR)
+    label = FONT.render("Ekwipunek postaci", True, HEADER_COLOR)
     screen.blit(label, (50, 20))
     column_width = 400
     margin_top = 80
@@ -320,16 +374,16 @@ def draw_inventory(screen):
         screen.blit(section_label, (x, y))
         y += FONT_SIZE + 10
         items = get_section_items(section_idx)
-        for i, item in enumerate(items):
+        for i, item_text in enumerate(items):
             color = TEXT_COLOR
             if section_idx == selected_section and i == selected_item_index:
                 color = (255, 255, 255)
-            label = FONT.render(item, True, color)
+            label = FONT.render(item_text, True, color)
             screen.blit(label, (x + 20, y))
             if section_idx == selected_section and i == selected_item_index:
                 rect = label.get_rect(topleft=(x + 20, y))
                 pygame.draw.rect(screen, (255, 255, 255), rect.inflate(6, 6), 2)
-            y += (FONT_SIZE + 6)
+            y += FONT_SIZE + 6
     pygame.display.flip()
 
 def draw(screen):
