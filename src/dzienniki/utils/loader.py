@@ -1,51 +1,23 @@
-import os
+# src/dzienniki/utils/loader.py
+
 import pygame
-from dzienniki import settings
+import os
 
-_image_cache = {}
-_sound_cache = {}
+def load_image(relative_path):
+    """Wczytuje obraz z podanej ścieżki względnej (np. 'assets/images/player/sprite.png')"""
+    full_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../", relative_path))
+    try:
+        image = pygame.image.load(full_path).convert_alpha()
+        return image
+    except Exception as e:
+        print(f"Nie udało się wczytać obrazu: {relative_path}\n{e}")
+        return pygame.Surface((32, 32))  # zapasowy placeholder
 
-def load_image(name: str) -> pygame.Surface:
-    """Ładuje i buforuje obrazek z assets/images."""
-    path = os.path.join(settings.IMAGES_DIR, name)
-    if os.path.exists(path):
-        img = pygame.image.load(path).convert_alpha()
-    else:
-        # placeholder: zielony kafelek
-        img = pygame.Surface((settings.TILE_SIZE, settings.TILE_SIZE))
-        img.fill((34, 177, 76))  # kolor trawy
-    return img
-
-def load_sound(name: str) -> pygame.mixer.Sound:
-    """Ładuje i buforuje dźwięk z assets/sounds."""
-    path = os.path.join(settings.SOUNDS_DIR, name)
-    if os.path.exists(path):
-        return pygame.mixer.Sound(path)
-    else:
-        # placeholder: „cichy” dźwięk
-        class Silent:
-            def play(self, *args, **kwargs): pass
-        return Silent()
-
-
-def load_icons_from_folder(relative_path):
-    """
-    Ładuje wszystkie pliki PNG z folderu i zwraca słownik:
-    {'nazwa_pliku_bez_rozszerzenia': pygame.Surface}
-    """
-    import glob
-    icon_dict = {}
-
-    folder = os.path.join("assets", "images", relative_path)
-    files = glob.glob(os.path.join(folder, "*.png"))
-
-    for path in files:
-        name = os.path.splitext(os.path.basename(path))[0]
-        try:
-            icon = pygame.image.load(path).convert_alpha()
-            icon_dict[name] = icon
-        except Exception as e:
-            print(f"❌ Nie udało się załadować {path}: {e}")
-
-    print(f"✔️ Załadowano {len(icon_dict)} ikon z {relative_path}")
-    return icon_dict
+def load_sound(relative_path):
+    """Wczytuje dźwięk z podanej ścieżki względnej (np. 'assets/sounds/blip.wav')"""
+    full_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../", relative_path))
+    try:
+        return pygame.mixer.Sound(full_path)
+    except Exception as e:
+        print(f"Nie udało się wczytać dźwięku: {relative_path}\n{e}")
+        return None
