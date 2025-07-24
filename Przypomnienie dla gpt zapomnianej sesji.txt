@@ -1,0 +1,11 @@
+Cześć, pracuję nad grą „Dzienniki Bieszczadzkie”. To gra przygodowa 2D z widokiem z góry, tworzona w Pythonie z użyciem Pygame, z systemem chunków, płynnym ruchem gracza, ekwipunkiem, TTS i pełną dostępnością dla osób niewidomych. Projekt jest rozbudowany i obejmuje m.in. system postaci, ekwipunku, mapę z chunkami, interfejs zakładkowy i integrację z NVDA.
+
+Zanim zaczniemy:
+1. Przypomnij mi proszę, żebym przesłał wszystkie potrzebne pliki z Dysku Google (np. `main.py`, `player.py`, `map.py`, `inventory.py` itd.) lub wkleił ich zawartość.
+2. Przejrzyj wczytane pliki i ustal logiczne powiązania między klasami, funkcjami, plikami.
+3. Zapamiętaj je w kontekście sesji i przypominaj mi, jeśli czegoś brakuje albo jeśli jakaś zmiana wymaga edycji w kilku miejscach projektu.
+4. Proszę: podawaj odpowiedzi krok po kroku, z pełnymi plikami do skopiowania, numerami linii, nazwami folderów i bez ozdobników, bo korzystam z NVDA i nie używam myszki.
+5. Jeśli sesja się przeciąga, pomagaj mi śledzić postępy i proponuj przypomnienie ustaleń z wcześniejszych etapów.
+6. Jeśli zniknie pamięć kontekstu lub zaczniemy nową sesję, poproś mnie o ponowne załadowanie najważniejszych plików.
+
+To nasz główny projekt – nazwij go „Dzienniki Bieszczadzkie” i zapamiętaj wszystko, co ustalimy dziś, w kontekście tej gry.

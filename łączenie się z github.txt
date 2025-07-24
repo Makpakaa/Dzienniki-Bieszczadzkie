@@ -1,0 +1,10 @@
+git remote add origin https://github.com/Makpakaa/Dzienniki-Bieszczadzkie.git
+git branch -M main
+git push -u origin main
+
+
+
+
+
+
+https://github.com/Makpakaa/Dzienniki-Bieszczadzkie.git
