@@ -1,3 +1,5 @@
+# src/dzienniki/game.py
+
 import pygame
 from dzienniki import settings
 from dzienniki.audio import tts
@@ -23,7 +25,7 @@ def topdown_game_loop(screen):
 
     inventory.init_font()
     show_inventory = False
-    tracker_mode = False
+    tracker_mode = False  # tryb przeglądania obiektów
 
     direction_names = {
         "up": "północ",
@@ -40,6 +42,7 @@ def topdown_game_loop(screen):
                 return
 
             elif event.type == pygame.KEYDOWN:
+                # ESC - wyjście lub zamknięcie menu
                 if event.key == pygame.K_ESCAPE:
                     if show_inventory:
                         show_inventory = False
@@ -50,6 +53,7 @@ def topdown_game_loop(screen):
                     else:
                         return
 
+                # E - ekwipunek
                 elif event.key == pygame.K_e:
                     show_inventory = not show_inventory
                     if show_inventory:
@@ -60,43 +64,61 @@ def topdown_game_loop(screen):
                     else:
                         tts.speak("Zamknięto ekwipunek.")
 
+                # R - powtórz ostatni komunikat
                 elif event.key == pygame.K_r:
                     if last_tts_message:
                         tts.speak(last_tts_message)
 
+                # T - tryb object tracker
                 elif event.key == pygame.K_t:
                     tracker.scan_area(player, map_rows, names)
                     tracker.speak_selected()
                     tracker_mode = True
 
-                elif event.key == pygame.K_RETURN and tracker_mode:
-                    tracker.set_flag(player)
+                # Ctrl+F - anuluj flagę
+                elif event.key == pygame.K_f and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+                    tracker.cancel_flag()
 
+                # F - kierunek do flagi
                 elif event.key == pygame.K_f:
                     tracker.speak_target_direction(player)
 
-                elif event.key == pygame.K_TAB and tracker_mode:
-                    if pygame.key.get_mods() & pygame.KMOD_SHIFT:
-                        tracker.switch_list(backwards=True)
+                # Enter - ustaw flagę lub wybór w submenu
+                elif event.key == pygame.K_RETURN and tracker_mode:
+                    if tracker.submenu_open:
+                        tracker.submenu_select()
                     else:
-                        tracker.switch_list()
+                        tracker.set_flag(player)
 
+                # Spacja - submenu
                 elif event.key == pygame.K_SPACE and tracker_mode:
-                    tracker.open_submenu(player)
+                    if tracker.submenu_open:
+                        tracker.submenu_select()
+                    else:
+                        tracker.open_submenu(player)
 
-                elif event.key == pygame.K_w and tracker_mode:
-                    tracker.previous_object()
+                # W/S - góra/dół
+                elif event.key in (pygame.K_w, pygame.K_s) and tracker_mode:
+                    if tracker.submenu_open:
+                        if event.key == pygame.K_w:
+                            tracker.submenu_prev()
+                        else:
+                            tracker.submenu_next()
+                    else:
+                        if event.key == pygame.K_w:
+                            tracker.previous_object()
+                        else:
+                            tracker.next_object()
 
-                elif event.key == pygame.K_s and tracker_mode:
-                    tracker.next_object()
+                # Tab / Shift+Tab - przełączanie list
+                elif event.key == pygame.K_TAB and tracker_mode:
+                    tracker.switch_list(backwards=bool(pygame.key.get_mods() & pygame.KMOD_SHIFT))
 
-                elif event.key == pygame.K_f and pygame.key.get_mods() & pygame.KMOD_CTRL:
-                    tracker.flag = None
-                    tts.speak("Anulowano flagę.")
-
+                # Obsługa inventory
                 elif show_inventory:
                     inventory.handle_inventory_navigation(event)
 
+        # Aktualizacja gracza (poza trybem menu)
         if not show_inventory and not tracker_mode:
             keys = pygame.key.get_pressed()
             player.handle_input(keys)
@@ -138,6 +160,7 @@ def topdown_game_loop(screen):
         screen.fill((0, 0, 0))
         size = settings.TILE_SIZE
 
+        # kafle mapy
         for row_idx, row in enumerate(map_rows):
             for col_idx, cell in enumerate(row):
                 color = (34, 139, 34)  # trawa
@@ -147,9 +170,16 @@ def topdown_game_loop(screen):
                     color = (128, 128, 128)  # kamień
                 pygame.draw.rect(screen, color, (col_idx * size, row_idx * size, size, size))
 
+        # flaga
+        tracker.draw_flag_on_map(screen, size)
+
+        # gracz
         player.draw(screen)
 
+        # inventory lub object tracker
         if show_inventory:
             inventory.draw(screen)
+        elif tracker_mode:
+            tracker.draw(screen)
 
         pygame.display.flip()
