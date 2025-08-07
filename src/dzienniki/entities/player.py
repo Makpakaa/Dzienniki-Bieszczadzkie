@@ -2,7 +2,6 @@
 
 import pygame
 from dzienniki import settings
-from dzienniki.audio import tts
 from dzienniki.utils.loader import load_image
 
 SPRITE_PATH = "assets/images/player/player_walk.png"
@@ -29,7 +28,8 @@ class Player:
         self.moving = False
         self.speed = 100  # px/s
 
-        self.sprite_sheet = load_image(SPRITE_PATH)
+        original = load_image(SPRITE_PATH)
+        self.sprite_sheet = pygame.transform.scale(original, (96, 128))
         self.frames = self.load_frames(settings.TILE_SIZE, settings.TILE_SIZE)
 
         self.rect = pygame.Rect(
@@ -96,16 +96,6 @@ class Player:
                 self.pixel_y = self.target_y
                 self.moving = False
                 self.frame = 0
-
-                x = self.grid_x
-                y = self.grid_y
-                if 0 <= y < len(map_rows) and 0 <= x < len(map_rows[0]):
-                    tile_symbol = map_rows[y][x]
-                    from dzienniki.systems.maps import TileMap
-                    name = TileMap().names.get(tile_symbol, "nieznane")
-                    tts.speak(f"Pozycja: X {x}, Y {y}. Kierunek: {self.facing}. Stoisz na: {name}.")
-                else:
-                    tts.speak(f"Pozycja: X {x}, Y {y}. Kierunek: {self.facing}. Poza mapą.")
 
             self.animation_timer += dt
             if self.animation_timer >= 0.15:
