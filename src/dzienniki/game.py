@@ -1,5 +1,3 @@
-# src/dzienniki/game.py
-
 import pygame
 from dzienniki import settings
 from dzienniki.audio import tts
@@ -71,13 +69,14 @@ def topdown_game_loop(screen):
 
                 # T - tryb object tracker
                 elif event.key == pygame.K_t:
+                    tracker.activate(player)
                     tracker.scan_area(player, map_rows, names)
                     tracker.speak_selected()
                     tracker_mode = True
 
                 # Ctrl+F - anuluj flagę
                 elif event.key == pygame.K_f and (pygame.key.get_mods() & pygame.KMOD_CTRL):
-                    tracker.cancel_flag()
+                    tracker.clear_flag()
 
                 # F - kierunek do flagi
                 elif event.key == pygame.K_f:
@@ -88,7 +87,7 @@ def topdown_game_loop(screen):
                     if tracker.submenu_open:
                         tracker.submenu_select()
                     else:
-                        tracker.set_flag(player)
+                        tracker.set_flag(player)  # flaga w miejscu gracza
 
                 # Spacja - submenu
                 elif event.key == pygame.K_SPACE and tracker_mode:
@@ -136,6 +135,15 @@ def topdown_game_loop(screen):
                 }.get(player.facing, (0, 0))
 
                 tx, ty = x + dx, y + dy
+
+                # --- NOWE: auto-kasowanie flagi ---
+                if tracker.auto_clear_flag_if_front_reached(player, map_rows, names):
+                    last_tts_message = "Jesteś u celu."
+                    prev_x = x
+                    prev_y = y
+                    prev_facing = player.facing
+                    continue  # pomiń komunikat o ruchu w tej klatce
+                # ---------------------------------
 
                 current_tile = map_rows[y][x] if 0 <= y < len(map_rows) and 0 <= x < len(map_rows[0]) else None
                 tile_ahead = map_rows[ty][tx] if 0 <= ty < len(map_rows) and 0 <= tx < len(map_rows[0]) else None
