@@ -1,4 +1,3 @@
-# src/dzienniki/systems/object_tracker.py
 import pygame
 from dzienniki.audio import tts
 
@@ -113,7 +112,7 @@ def _tile_display_name(map_rows, names, x, y):
 
 
 def _facing_vec(facing: str):
-    """Zwraca wektor (dx, dy) z Twoich kierunków: up/down/left/right."""
+    """Wektor kratki przed graczem dla facing: up/down/left/right."""
     return {
         "up": (0, -1),
         "down": (0, 1),
@@ -130,9 +129,6 @@ class ObjectTracker:
     Dwie listy:
       - self.objects      -> zeskanowane obiekty (lista 1)
       - self.saved_points -> zapisane punkty użytkownika (lista 2)
-
-    Flaga:
-      self.flag = {"pos": (x, y), "name": str|None}
     """
     def __init__(self):
         # Dane
@@ -148,8 +144,10 @@ class ObjectTracker:
         self._scroll_offset_left = 0
         self._scroll_offset_right = 0
 
-        # Flaga celu: dict lub None
+        # Flaga celu (x, y) jako krotka lub None
         self.flag = None
+        # Etykieta celu do wypowiedzenia przy dotarciu
+        self.flag_label = None
 
         # Submenu
         self.show_submenu = False
@@ -229,7 +227,7 @@ class ObjectTracker:
 
     def deactivate(self):
         self.active = False
-        self._player_ref = None
+        self._player_ref = None  # (FIX) poprawne wcięcie
         self.show_submenu = False
         self._speak("Zamknięto nawigację obiektów.")
 
@@ -286,12 +284,12 @@ class ObjectTracker:
             self._speak("Nie znaleziono obiektów w pobliżu.")
 
     # ---------- Flaga ----------
-    def set_flag(self, pos_or_player, name: str | None = None):
+    def set_flag(self, pos_or_player):
         """
         Ustawia flagę:
         - (x, y)  -> bezpośrednio
         - player  -> na pozycji gracza
-        - name    -> opcjonalna nazwa celu (np. nazwa obiektu lub zapisany punkt)
+        Uwaga: zawsze zeruje flag_label (żeby nie został stary opis).
         """
         if hasattr(pos_or_player, "grid_x") and hasattr(pos_or_player, "grid_y"):
             x, y = pos_or_player.grid_x, pos_or_player.grid_y
@@ -300,12 +298,13 @@ class ObjectTracker:
         else:
             self._speak("Nieprawidłowa pozycja flagi.")
             return
-        self.flag = {"pos": (int(x), int(y)), "name": (str(name).strip() if name else None)}
-        target_desc = self.flag["name"] if self.flag["name"] else f"{self.flag['pos'][0]} {self.flag['pos'][1]}"
-        self._speak(f"Ustawiono flagę. Cel: {target_desc}.")
+        self.flag = (int(x), int(y))
+        self.flag_label = None
+        self._speak(f"Ustawiono flagę. Cel: {self.flag[0]} {self.flag[1]}.")
 
     def clear_flag(self):
         self.flag = None
+        self.flag_label = None
         self._speak("Anulowano flagę.")
 
     def speak_target_direction(self, player, consider_front_tile: bool = False):
@@ -316,7 +315,7 @@ class ObjectTracker:
         py = getattr(player, "grid_y", None)
         if px is None or py is None:
             return
-        tx, ty = self.flag["pos"]
+        tx, ty = self.flag
         direction, distance = _dir_and_distance(px, py, tx, ty)
         if distance == 0:
             msg = "Flaga jest dokładnie na Twojej kratce."
@@ -334,9 +333,9 @@ class ObjectTracker:
         refy = getattr(player, "grid_y", None)
         if refx is None or refy is None:
             return False
-        if (int(refx), int(refy)) == (int(self.flag["pos"][0]), int(self.flag["pos"][1])):
-            pos = self.flag["pos"]
-            self.flag = None
+        if (int(refx), int(refy)) == (int(self.flag[0]), int(self.flag[1])):
+            pos = self.flag
+            self.clear_flag()
             self._speak("Cel osiągnięty. Flaga usunięta.")
             if callable(self.on_flag_reached):
                 try:
@@ -350,7 +349,7 @@ class ObjectTracker:
         """
         Jeśli kratka PRZED graczem == pozycja flagi:
          - usuń flagę
-         - powiedz: 'Jesteś u celu. {nazwa}'
+         - powiedz: 'Jesteś u celu. {nazwa}' (najpierw flag_label, potem nazwa kafla, inaczej współrzędne)
         Zwraca True, gdy flaga została skasowana.
         """
         if not self.flag:
@@ -364,17 +363,11 @@ class ObjectTracker:
 
         dx, dy = _facing_vec(facing)
         front = (px + dx, py + dy)
-        if front == tuple(self.flag["pos"]):
-            # Nazwa: priorytet 1 – podana przy ustawianiu flagi
-            name = self.flag["name"]
-            if not name:
-                # Priorytet 2 – nazwa kafla z mapy
-                name = _tile_display_name(map_rows, names, front[0], front[1])
-            if not name:
-                # Ostatecznie współrzędne
-                name = f"{front[0]} {front[1]}"
-
+        if front == tuple(self.flag):
+            # 1) nazwa z wyboru (obiekt / zapisany punkt), 2) nazwa kafla, 3) współrzędne
+            name = self.flag_label or _tile_display_name(map_rows, names, front[0], front[1]) or f"{front[0]} {front[1]}"
             self.flag = None
+            self.flag_label = None
             self._speak(f"Jesteś u celu. {name}")
             if callable(self.on_flag_reached):
                 try:
@@ -488,7 +481,7 @@ class ObjectTracker:
     def draw_flag_on_map(self, screen, tile_size):
         if self.flag is None:
             return
-        fx, fy = self.flag["pos"]
+        fx, fy = self.flag
         flag_rect = pygame.Rect(fx * tile_size, fy * tile_size, tile_size, tile_size)
         pygame.draw.rect(screen, (255, 0, 0), flag_rect, 3)
         cx = flag_rect.centerx
@@ -548,6 +541,49 @@ class ObjectTracker:
             self._speak("Brak menu do zamknięcia.")
             return
 
+    # ---------- Alias kompatybilności z Twoim game.py ----------
+    @property
+    def submenu_open(self):
+        return self.show_submenu
+
+    def activate_selection(self):
+        """ENTER/SPACE w trackerze (publiczne API)"""
+        self._activate_selection()
+
+    def submenu_select(self):
+        """ENTER/SPACE w submenu."""
+        if self.show_submenu:
+            self._execute_submenu_action()
+
+    def open_submenu(self, _player=None):
+        """SPACE poza submenu -> otwórz jeśli dostępne."""
+        self._open_submenu_if_available()
+
+    def previous_object(self):
+        """W poprzedni wiersz (lista aktywna)."""
+        self._move_selection(-1)
+
+    def next_object(self):
+        """W następny wiersz (lista aktywna)."""
+        self._move_selection(+1)
+
+    def switch_list(self, backwards=False):
+        """Tab / Shift+Tab."""
+        self._switch_list(next_=not backwards)
+
+    def submenu_prev(self):
+        """W wiersz wyżej w submenu."""
+        if self.show_submenu:
+            self.submenu_index = (self.submenu_index - 1) % len(self.submenu_options)
+            self._speak(self.submenu_options[self.submenu_index])
+
+    def submenu_next(self):
+        """W wiersz niżej w submenu."""
+        if self.show_submenu:
+            self.submenu_index = (self.submenu_index + 1) % len(self.submenu_options)
+            self._speak(self.submenu_options[self.submenu_index])
+
+    # --- Wewnętrzne akcje list ---
     def _move_selection(self, step):
         if self.list_index == 0:
             max_rows = max(1, len(self.objects))
@@ -581,7 +617,9 @@ class ObjectTracker:
                 self._speak("Brak obiektów.")
                 return
             o = self.objects[self.selected_index]
-            self.set_flag((o["x"], o["y"]), name=o["name"])
+            # Najpierw ustaw flagę, potem etykietę (set_flag czyści label)
+            self.set_flag((o["x"], o["y"]))
+            self.flag_label = o["name"]
         else:
             if self.selected_index == 0:
                 if not self._player_ref:
@@ -593,7 +631,9 @@ class ObjectTracker:
                 self._speak(f"Dodano punkt: {new_name}, {px} {py}.")
             else:
                 sp = self.saved_points[self.selected_index - 1]
-                self.set_flag(sp["pos"], name=sp["name"])
+                # Najpierw flaga, potem etykieta
+                self.set_flag(sp["pos"])
+                self.flag_label = sp["name"]
 
     def _open_submenu_if_available(self):
         if self.list_index == 1 and self.selected_index > 0 and self.saved_points:
@@ -628,48 +668,10 @@ class ObjectTracker:
                 self._speak(f"Zmieniono nazwę na {sp['name']}.")
         elif action == "Usuń":
             removed = self.saved_points.pop(idx)
-            if self.flag and self.flag.get("pos") == tuple(removed["pos"]):
+            if self.flag and self.flag == tuple(removed["pos"]):
                 self.clear_flag()
             self._speak("Usunięto punkt.")
             if self.selected_index > len(self.saved_points):
                 self.selected_index = max(0, len(self.saved_points))
 
         self.show_submenu = False
-
-    # ---------- Alias kompatybilności z Twoim game.py ----------
-    @property
-    def submenu_open(self):
-        return self.show_submenu
-
-    def submenu_select(self):
-        """ENTER/SPACE w submenu."""
-        if self.show_submenu:
-            self._execute_submenu_action()
-
-    def open_submenu(self, _player=None):
-        """SPACE poza submenu -> otwórz jeśli dostępne."""
-        self._open_submenu_if_available()
-
-    def previous_object(self):
-        """W poprzedni wiersz (lista aktywna)."""
-        self._move_selection(-1)
-
-    def next_object(self):
-        """W następny wiersz (lista aktywna)."""
-        self._move_selection(+1)
-
-    def switch_list(self, backwards=False):
-        """Tab / Shift+Tab."""
-        self._switch_list(next_=not backwards)
-
-    def submenu_prev(self):
-        """W wiersz wyżej w submenu."""
-        if self.show_submenu:
-            self.submenu_index = (self.submenu_index - 1) % len(self.submenu_options)
-            self._speak(self.submenu_options[self.submenu_index])
-
-    def submenu_next(self):
-        """W wiersz niżej w submenu."""
-        if self.show_submenu:
-            self.submenu_index = (self.submenu_index + 1) % len(self.submenu_options)
-            self._speak(self.submenu_options[self.submenu_index])
