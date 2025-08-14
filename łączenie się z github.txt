@@ -1,15 +1,14 @@
 git clone https://github.com/Makpakaa/Dzienniki-Bieszczadzkie.git
 
+pip install -r requirements.txt
+To zainstaluje wszystkie wymagane moduły.
+
 cd Dzienniki-Bieszczadzkie
 
 git pull         # pobiera zmiany z GitHub
 git add .
 git commit -m "..."
 git push         # wysyła zmiany na GitHub
-
-
-
-
 
 git remote add origin https://github.com/Makpakaa/Dzienniki-Bieszczadzkie.git
 git branch -M main

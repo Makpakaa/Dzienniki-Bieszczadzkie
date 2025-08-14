@@ -1,5 +1,7 @@
 import pygame
 from dzienniki.audio import tts
+import os
+import json
 
 # -----------------------------
 # Ustawienia
@@ -121,6 +123,17 @@ def _facing_vec(facing: str):
     }.get(facing, (0, 0))
 
 
+def _default_saved_points_path():
+    """
+    Domyślna ścieżka zapisu punktów:
+    .../src/dzienniki/saves/saved_points.json
+    """
+    dzienniki_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # src/dzienniki
+    saves_dir = os.path.join(dzienniki_dir, "saves")
+    os.makedirs(saves_dir, exist_ok=True)
+    return os.path.join(saves_dir, "saved_points.json")
+
+
 # -----------------------------
 # Klasa główna
 # -----------------------------
@@ -227,7 +240,7 @@ class ObjectTracker:
 
     def deactivate(self):
         self.active = False
-        self._player_ref = None  # (FIX) poprawne wcięcie
+        self._player_ref = None
         self.show_submenu = False
         self._speak("Zamknięto nawigację obiektów.")
 
@@ -377,6 +390,49 @@ class ObjectTracker:
             return True
 
         return False
+
+    # ---------- ZAPIS / WCZYTANIE ZAPISANYCH PUNKTÓW ----------
+    def save_points_to_file(self, path: str | None = None):
+        """Zapisuje self.saved_points do JSON. Domyślnie do src/dzienniki/saves/saved_points.json"""
+        try:
+            file_path = path or _default_saved_points_path()
+            data = []
+            for sp in self.saved_points:
+                name = str(sp.get("name", "")).strip()
+                pos = sp.get("pos", (0, 0))
+                x = int(pos[0]) if isinstance(pos, (list, tuple)) and len(pos) >= 2 else int(pos.get("x", 0)) if isinstance(pos, dict) else 0
+                y = int(pos[1]) if isinstance(pos, (list, tuple)) and len(pos) >= 2 else int(pos.get("y", 0)) if isinstance(pos, dict) else 0
+                data.append({"name": name, "pos": [x, y]})
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump({"saved_points": data}, f, ensure_ascii=False, indent=2)
+            self._speak(f"Zapisano {len(data)} punktów.")
+        except Exception as e:
+            self._speak(f"Błąd zapisu punktów: {e}")
+
+    def load_points_from_file(self, path: str | None = None):
+        """Wczytuje self.saved_points z JSON. Domyślnie z src/dzienniki/saves/saved_points.json"""
+        try:
+            file_path = path or _default_saved_points_path()
+            if not os.path.exists(file_path):
+                self._speak("Brak pliku zapisu punktów.")
+                return
+            with open(file_path, "r", encoding="utf-8") as f:
+                obj = json.load(f)
+            items = obj.get("saved_points", [])
+            loaded = []
+            for it in items:
+                name = str(it.get("name", "")).strip() or f"Punkt {len(loaded) + 1}"
+                pos = it.get("pos", [0, 0])
+                try:
+                    x = int(pos[0])
+                    y = int(pos[1])
+                except Exception:
+                    continue
+                loaded.append({"name": name, "pos": (x, y)})
+            self.saved_points = loaded
+            self._speak(f"Wczytano {len(self.saved_points)} punktów.")
+        except Exception as e:
+            self._speak(f"Błąd wczytywania punktów: {e}")
 
     # ---------- Rysowanie ----------
     def _compute_visible_rows(self, rect_height):
@@ -617,7 +673,7 @@ class ObjectTracker:
                 self._speak("Brak obiektów.")
                 return
             o = self.objects[self.selected_index]
-            # Najpierw ustaw flagę, potem etykietę (set_flag czyści label)
+            # Najpierw flaga, potem etykieta
             self.set_flag((o["x"], o["y"]))
             self.flag_label = o["name"]
         else:
@@ -629,9 +685,19 @@ class ObjectTracker:
                 new_name = f"Punkt {len(self.saved_points) + 1}"
                 self.saved_points.append({"name": new_name, "pos": (px, py)})
                 self._speak(f"Dodano punkt: {new_name}, {px} {py}.")
+                # (A) NATYCHMIASTOWE NAZYWANIE I AUTO-ZAPIS PO ENTERZE
+                if callable(self.rename_provider):
+                    try:
+                        proposed = new_name
+                        rename = self.rename_provider(proposed)
+                    except Exception:
+                        rename = None
+                    if rename and isinstance(rename, str) and rename.strip():
+                        self.saved_points[-1]["name"] = rename.strip()
+                        self._speak(f"Nazwa punktu ustawiona: {self.saved_points[-1]['name']}. Zapisuję punkty.")
+                        self.save_points_to_file()
             else:
                 sp = self.saved_points[self.selected_index - 1]
-                # Najpierw flaga, potem etykieta
                 self.set_flag(sp["pos"])
                 self.flag_label = sp["name"]
 
@@ -662,7 +728,9 @@ class ObjectTracker:
                     new_name = None
             if new_name and isinstance(new_name, str) and new_name.strip():
                 sp["name"] = new_name.strip()
-                self._speak(f"Zmieniono nazwę na {sp['name']}.")
+                # (B) AUTO-ZAPIS PO POTWIERDZENIU NOWEJ NAZWY ENTEREM
+                self.save_points_to_file()
+                self._speak(f"Zmieniono nazwę na {sp['name']}. Zapisano.")
             else:
                 sp["name"] = f"{sp['name']}*"
                 self._speak(f"Zmieniono nazwę na {sp['name']}.")

@@ -1,3 +1,4 @@
+# src/dzienniki/game.py
 import pygame
 from dzienniki import settings
 from dzienniki.audio import tts
@@ -5,11 +6,22 @@ from dzienniki.entities.player import Player
 from dzienniki.systems.maps import TileMap
 from dzienniki.systems import inventory
 from dzienniki.systems.object_tracker import ObjectTracker
+from dzienniki.ui.text_input import ask_text  # okno nazwy punktu
 
 def topdown_game_loop(screen):
     clock = pygame.time.Clock()
     player = Player()
     tracker = ObjectTracker()
+
+    # okno wprowadzania nazwy punktu
+    tracker.rename_provider = lambda old_name: ask_text(screen, "Nazwa punktu", old_name)
+
+    # AUTOMATYCZNE WCZYTANIE zapisanych punktów przy starcie gry
+    try:
+        tracker.load_points_from_file()
+    except Exception:
+        # cicho — metoda sama powie TTS-em o błędzie, jeśli wystąpi
+        pass
 
     prev_x = player.grid_x
     prev_y = player.grid_y
@@ -78,16 +90,51 @@ def topdown_game_loop(screen):
                 elif event.key == pygame.K_f and (pygame.key.get_mods() & pygame.KMOD_CTRL):
                     tracker.clear_flag()
 
+                # Ctrl+S - zapisz zapisane punkty
+                elif event.key == pygame.K_s and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+                    tracker.save_points_to_file()
+
+                # Ctrl+L - wczytaj zapisane punkty (ręcznie)
+                elif event.key == pygame.K_l and (pygame.key.get_mods() & pygame.KMOD_CTRL):
+                    tracker.load_points_from_file()
+
                 # F - kierunek do flagi
                 elif event.key == pygame.K_f:
                     tracker.speak_target_direction(player)
 
-                # Enter - ustaw flagę lub wybór w submenu
+                # Enter - ustaw flagę na wybranym wierszu (bezpośrednio)
                 elif event.key == pygame.K_RETURN and tracker_mode:
                     if tracker.submenu_open:
                         tracker.submenu_select()
                     else:
-                        tracker.set_flag(player)  # flaga w miejscu gracza
+                        # Lewa lista: Zeskanowane obiekty
+                        if tracker.list_index == 0:
+                            if tracker.objects:
+                                try:
+                                    o = tracker.objects[tracker.selected_index]
+                                    tracker.set_flag((o["x"], o["y"]))
+                                    if hasattr(tracker, "flag_label"):
+                                        tracker.flag_label = o.get("name")
+                                    tts.speak(f"Cel ustawiony: {o.get('name', '')}, {o['x']} {o['y']}.")
+                                except Exception:
+                                    tracker.activate_selection()
+                            else:
+                                tts.speak("Brak obiektów.")
+                        # Prawa lista: Zapisane punkty
+                        else:
+                            if tracker.selected_index == 0:
+                                # „Ustaw punkt” (wewnątrz tracker poprosi o nazwę i AUTO-zapisze)
+                                tracker.activate_selection()
+                            else:
+                                idx = tracker.selected_index - 1
+                                if 0 <= idx < len(tracker.saved_points):
+                                    sp = tracker.saved_points[idx]
+                                    tracker.set_flag(sp["pos"])
+                                    if hasattr(tracker, "flag_label"):
+                                        tracker.flag_label = sp.get("name")
+                                    tts.speak(f"Cel ustawiony: {sp.get('name','')}, {sp['pos'][0]} {sp['pos'][1]}.")
+                                else:
+                                    tts.speak("Błędny wybór zapisanego punktu.")
 
                 # Spacja - submenu
                 elif event.key == pygame.K_SPACE and tracker_mode:
@@ -96,7 +143,7 @@ def topdown_game_loop(screen):
                     else:
                         tracker.open_submenu(player)
 
-                # W/S - góra/dół
+                # W/S - góra/dół (tylko w trackerze)
                 elif event.key in (pygame.K_w, pygame.K_s) and tracker_mode:
                     if tracker.submenu_open:
                         if event.key == pygame.K_w:
@@ -136,14 +183,12 @@ def topdown_game_loop(screen):
 
                 tx, ty = x + dx, y + dy
 
-                # --- NOWE: auto-kasowanie flagi ---
-                if tracker.auto_clear_flag_if_front_reached(player, map_rows, names):
+                if hasattr(tracker, "auto_clear_flag_if_front_reached") and tracker.auto_clear_flag_if_front_reached(player, map_rows, names):
                     last_tts_message = "Jesteś u celu."
                     prev_x = x
                     prev_y = y
                     prev_facing = player.facing
-                    continue  # pomiń komunikat o ruchu w tej klatce
-                # ---------------------------------
+                    continue
 
                 current_tile = map_rows[y][x] if 0 <= y < len(map_rows) and 0 <= x < len(map_rows[0]) else None
                 tile_ahead = map_rows[ty][tx] if 0 <= ty < len(map_rows) and 0 <= tx < len(map_rows[0]) else None
@@ -153,7 +198,6 @@ def topdown_game_loop(screen):
 
                 direction_label = direction_names.get(player.facing, player.facing)
                 message = f"X {x}, Y {y}, {direction_label}, stoisz na {current_tile_name}."
-
                 if tile_ahead_name != current_tile_name:
                     message += f" Przed tobą {tile_ahead_name}."
 
@@ -164,27 +208,21 @@ def topdown_game_loop(screen):
                 prev_y = y
                 prev_facing = player.facing
 
-        # Rysowanie
         screen.fill((0, 0, 0))
         size = settings.TILE_SIZE
 
-        # kafle mapy
         for row_idx, row in enumerate(map_rows):
             for col_idx, cell in enumerate(row):
-                color = (34, 139, 34)  # trawa
+                color = (34, 139, 34)
                 if cell == "w":
-                    color = (0, 0, 255)  # woda
+                    color = (0, 0, 255)
                 elif cell == "s":
-                    color = (128, 128, 128)  # kamień
+                    color = (128, 128, 128)
                 pygame.draw.rect(screen, color, (col_idx * size, row_idx * size, size, size))
 
-        # flaga
         tracker.draw_flag_on_map(screen, size)
-
-        # gracz
         player.draw(screen)
 
-        # inventory lub object tracker
         if show_inventory:
             inventory.draw(screen)
         elif tracker_mode:
