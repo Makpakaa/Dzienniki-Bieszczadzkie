@@ -1,4 +1,3 @@
-# src/dzienniki/game.py
 import pygame
 from dzienniki import settings
 from dzienniki.audio import tts
@@ -23,11 +22,6 @@ def topdown_game_loop(screen):
         # cicho — metoda sama powie TTS-em o błędzie, jeśli wystąpi
         pass
 
-    prev_x = player.grid_x
-    prev_y = player.grid_y
-    prev_facing = player.facing
-    last_tts_message = ""
-
     tilemap = TileMap()
     map_rows = tilemap.rows
     passable = tilemap.passable
@@ -36,13 +30,6 @@ def topdown_game_loop(screen):
     inventory.init_font()
     show_inventory = False
     tracker_mode = False  # tryb przeglądania obiektów
-
-    direction_names = {
-        "up": "północ",
-        "down": "południe",
-        "left": "zachód",
-        "right": "wschód"
-    }
 
     while True:
         dt = clock.tick(settings.FPS) / 1000.0
@@ -74,10 +61,16 @@ def topdown_game_loop(screen):
                     else:
                         tts.speak("Zamknięto ekwipunek.")
 
-                # R - powtórz ostatni komunikat
+                # R - powtórz ostatni komunikat (tracker albo gracz)
                 elif event.key == pygame.K_r:
-                    if last_tts_message:
-                        tts.speak(last_tts_message)
+                    if tracker_mode:
+                        tracker.repeat_last_message()
+                    else:
+                        # wymaga metody repeat_last_message() w Player (patrz niżej)
+                        if hasattr(player, "repeat_last_message"):
+                            player.repeat_last_message()
+                        else:
+                            tts.speak("Brak komunikatu do powtórzenia.")
 
                 # T - tryb object tracker
                 elif event.key == pygame.K_t:
@@ -102,7 +95,7 @@ def topdown_game_loop(screen):
                 elif event.key == pygame.K_f:
                     tracker.speak_target_direction(player)
 
-                # Enter - ustaw flagę na wybranym wierszu (bezpośrednio)
+                # Enter - akcja w trackerze (ustaw flagę / ustaw punkt / submenu)
                 elif event.key == pygame.K_RETURN and tracker_mode:
                     if tracker.submenu_open:
                         tracker.submenu_select()
@@ -112,10 +105,9 @@ def topdown_game_loop(screen):
                             if tracker.objects:
                                 try:
                                     o = tracker.objects[tracker.selected_index]
-                                    tracker.set_flag((o["x"], o["y"]))
+                                    tracker.set_flag((o["x"], o["y"]))  # tracker sam mówi "Ustawiono flagę..."
                                     if hasattr(tracker, "flag_label"):
                                         tracker.flag_label = o.get("name")
-                                    tts.speak(f"Cel ustawiony: {o.get('name', '')}, {o['x']} {o['y']}.")
                                 except Exception:
                                     tracker.activate_selection()
                             else:
@@ -129,10 +121,9 @@ def topdown_game_loop(screen):
                                 idx = tracker.selected_index - 1
                                 if 0 <= idx < len(tracker.saved_points):
                                     sp = tracker.saved_points[idx]
-                                    tracker.set_flag(sp["pos"])
+                                    tracker.set_flag(sp["pos"])  # tracker sam mówi
                                     if hasattr(tracker, "flag_label"):
                                         tracker.flag_label = sp.get("name")
-                                    tts.speak(f"Cel ustawiony: {sp.get('name','')}, {sp['pos'][0]} {sp['pos'][1]}.")
                                 else:
                                     tts.speak("Błędny wybór zapisanego punktu.")
 
@@ -164,50 +155,17 @@ def topdown_game_loop(screen):
                 elif show_inventory:
                     inventory.handle_inventory_navigation(event)
 
-        # Aktualizacja gracza (poza trybem menu)
+        # Aktualizacja gracza (poza trybem menu/trackera)
         if not show_inventory and not tracker_mode:
             keys = pygame.key.get_pressed()
             player.handle_input(keys)
-            player.update(dt, map_rows, passable)
+            player.update(dt, map_rows, passable, names)
 
-            x = player.grid_x
-            y = player.grid_y
+            # Sprawdzaj automatyczne domknięcie flagi, gdy ramka przed graczem dojdzie do celu
+            if hasattr(tracker, "auto_clear_flag_if_front_reached"):
+                tracker.auto_clear_flag_if_front_reached(player, map_rows, names)
 
-            if x != prev_x or y != prev_y or player.facing != prev_facing:
-                dx, dy = {
-                    "up": (0, -1),
-                    "down": (0, 1),
-                    "left": (-1, 0),
-                    "right": (1, 0)
-                }.get(player.facing, (0, 0))
-
-                tx, ty = x + dx, y + dy
-
-                if hasattr(tracker, "auto_clear_flag_if_front_reached") and tracker.auto_clear_flag_if_front_reached(player, map_rows, names):
-                    last_tts_message = "Jesteś u celu."
-                    prev_x = x
-                    prev_y = y
-                    prev_facing = player.facing
-                    continue
-
-                current_tile = map_rows[y][x] if 0 <= y < len(map_rows) and 0 <= x < len(map_rows[0]) else None
-                tile_ahead = map_rows[ty][tx] if 0 <= ty < len(map_rows) and 0 <= tx < len(map_rows[0]) else None
-
-                current_tile_name = names.get(current_tile, "nieznane") if current_tile else "poza mapą"
-                tile_ahead_name = names.get(tile_ahead, "nieznane") if tile_ahead else "poza mapą"
-
-                direction_label = direction_names.get(player.facing, player.facing)
-                message = f"X {x}, Y {y}, {direction_label}, stoisz na {current_tile_name}."
-                if tile_ahead_name != current_tile_name:
-                    message += f" Przed tobą {tile_ahead_name}."
-
-                tts.speak(message)
-                last_tts_message = message
-
-                prev_x = x
-                prev_y = y
-                prev_facing = player.facing
-
+        # Rysowanie
         screen.fill((0, 0, 0))
         size = settings.TILE_SIZE
 

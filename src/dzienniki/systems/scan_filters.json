@@ -1,0 +1,6 @@
+{
+  "ignore_contains": ["trawa", "grass", "grass_short"],
+  "ignore_names": [],
+  "allow_names": [],
+  "max_distance": null
+}

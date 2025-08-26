@@ -2,6 +2,7 @@ import pygame
 from dzienniki.audio import tts
 import os
 import json
+from dzienniki.utils.scan_filters import load_scan_filters, should_ignore
 
 # -----------------------------
 # Ustawienia
@@ -181,6 +182,9 @@ class ObjectTracker:
         # Filtry (nazwy ignorowane, case-insensitive)
         self.ignore_names = {n.strip().casefold() for n in IGNORE_NAMES}
 
+        # Konfiguracja filtrów z pliku settings/scan_filters.json
+        self._scan_cfg = load_scan_filters()
+
     # ---------- API filtrów ----------
     def set_ignore_names(self, names):
         """Ustaw listę nazw do ignorowania w skanie (np. ['trawa', 'piasek'])."""
@@ -249,15 +253,18 @@ class ObjectTracker:
         Skanuje obszar wokół gracza:
         - Kafle bierzemy z map_rows.
         - Nazwy tłumaczymy przez 'names' jako słownik {ID: nazwa}.
-        - Pomijamy nazwy ustawione w self.ignore_names (np. 'trawa').
+        - Pomijamy nazwy ustawione w self.ignore_names oraz wynikające z scan_filters.json.
         """
         self.objects.clear()
         px, py = player.grid_x, player.grid_y
 
-        x_min = px - SCAN_RADIUS
-        x_max = px + SCAN_RADIUS
-        y_min = py - SCAN_RADIUS
-        y_max = py + SCAN_RADIUS
+        # Promień: z konfiguracji lub stała
+        radius = self._scan_cfg.get("max_distance") or SCAN_RADIUS
+
+        x_min = px - radius
+        x_max = px + radius
+        y_min = py - radius
+        y_max = py + radius
 
         for y in range(y_min, y_max + 1):
             for x in range(x_min, x_max + 1):
@@ -268,7 +275,11 @@ class ObjectTracker:
                 if not (tile_name and str(tile_name).strip()):
                     continue
 
-                # --- filtr nazw (case-insensitive) ---
+                # --- filtr z pliku scan_filters.json (contains/exact/allow list) ---
+                if should_ignore(str(tile_name), self._scan_cfg):
+                    continue
+
+                # --- dodatkowy filtr ręczny (Twoja lista) ---
                 name_norm = str(tile_name).strip().casefold()
                 if name_norm in self.ignore_names:
                     continue
