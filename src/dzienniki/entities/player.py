@@ -72,18 +72,13 @@ def _tile_name_at(x: int, y: int, map_rows, names):
 
     return None
 
-def _is_passable(x: int, y: int, passable) -> bool:
-    if passable is None:
-        return True
+def _tile_id_at(x: int, y: int, map_rows):
     try:
-        if 0 <= y < len(passable) and 0 <= x < len(passable[0]):
-            cell = passable[y][x]
-            if isinstance(cell, bool):
-                return cell
-            return bool(cell)
+        if 0 <= y < len(map_rows) and 0 <= x < len(map_rows[0]):
+            return map_rows[y][x]
     except Exception:
-        return False
-    return False
+        pass
+    return None
 
 
 class Player:
@@ -102,8 +97,12 @@ class Player:
         self.moving = False
         self.speed = 100.0  # px/s
 
-        self._held_dir = (0, 0)   # kierunek trzymanego klawisza
-        self._last_tts = ""       # do powtórzenia komunikatu
+        self._held_dir = (0, 0)      # kierunek trzymanego klawisza
+        self._last_tts = ""          # do powtórzenia komunikatu
+        self._last_blocked = None    # (nx, ny) ostatnio zablokowany cel; anty-spam
+
+        # Autowykrywanie semantyki siatki 2D passable (jeśli używana)
+        self._pass_mode_2d = None    # 'zero_is_free' | 'nonzero_is_free' | None
 
         original = load_image(SPRITE_PATH)
         # Zakładamy 3 kolumny x 4 wiersze, skalowanie do TILE_SIZE
@@ -129,6 +128,7 @@ class Player:
                 frames[dir_name].append(image)
         return frames
 
+    # ---------- Wejście ----------
     def handle_input(self, keys):
         # Ustal kierunek z priorytetem: W/S > A/D (unikamy diagonali)
         dx = dy = 0
@@ -151,42 +151,38 @@ class Player:
 
         self._held_dir = (dx, dy)
 
-    def _begin_step(self, dx: int, dy: int):
-        # Rozpocznij ruch do kolejnej kratki (bez sprawdzania kolizji)
-        self.grid_x += dx
-        self.grid_y += dy
-        self.target_x = self.grid_x * settings.TILE_SIZE
-        self.target_y = self.grid_y * settings.TILE_SIZE
-        self.moving = True
-
+    # ---------- Mowa ----------
     def _speak(self, msg: str):
         self._last_tts = msg or ""
         tts.speak(msg)
 
+    def repeat_last_message(self):
+        if self._last_tts:
+            tts.speak(self._last_tts)
+
     def _speak_after_arrival(self, map_rows, names):
-        # 1) Pozycja X/Y
         pos = f"Pozycja: {self.grid_x} {self.grid_y}."
-        # 2) Kierunek słownie
         dir_word = _dir_word(self.facing)
         kier = f"Kierunek: {dir_word}."
-        # 3) „Stoisz na …”
         here = _tile_name_at(self.grid_x, self.grid_y, map_rows, names)
         if here and str(here).strip():
             here_msg = f"Stoisz na {here}."
         else:
             here_msg = "Stoisz na nieznanym terenie."
-        # 4) „Przed tobą …” tylko jeśli inny kafel
         dx, dy = _facing_vec(self.facing)
         front_name = _tile_name_at(self.grid_x + dx, self.grid_y + dy, map_rows, names)
         front_msg = ""
         if front_name and front_name != here:
             front_msg = f"Przed tobą {front_name}."
-
         msg = " ".join([pos, kier, here_msg, front_msg]).strip()
         self._speak(msg)
 
     def _speak_collision(self, map_rows, names, nx, ny):
-        # Powtórz ostatni komunikat i dodaj rodzaj kolizji (jeśli znamy)
+        # Anty-spam: mów tylko przy pierwszym uderzeniu w daną kratkę
+        if self._last_blocked == (nx, ny):
+            return
+        self._last_blocked = (nx, ny)
+
         block = _tile_name_at(nx, ny, map_rows, names)
         if block and str(block).strip():
             info = f"Kolizja: {block}."
@@ -196,6 +192,70 @@ class Player:
             tts.speak(self._last_tts)
         self._speak(info)
 
+    # ---------- Ruch i kolizje ----------
+    def _infer_pass_mode_2d(self, passable_2d):
+        """Ustal, czy 0 oznacza przejście, czy blokadę — na podstawie kratki startowej."""
+        try:
+            cell = passable_2d[self.grid_y][self.grid_x]
+        except Exception:
+            self._pass_mode_2d = None
+            return
+        if isinstance(cell, (int, float)):
+            self._pass_mode_2d = 'zero_is_free' if cell == 0 else 'nonzero_is_free'
+        else:
+            self._pass_mode_2d = None  # dla bool nie potrzeba
+
+    def _is_passable(self, x: int, y: int, map_rows, passable) -> bool:
+        """Obsługuje zarówno 2D siatkę, jak i dict {tile_id: bool/int}."""
+        if passable is None:
+            return True
+
+        # 1) Słownik {tile_id: bool/int}
+        if isinstance(passable, dict):
+            tid = _tile_id_at(x, y, map_rows)
+            # Domyślnie traktujemy brak wpisu jako przejście
+            val = passable.get(tid, True)
+            if isinstance(val, bool):
+                return val
+            if isinstance(val, (int, float)):
+                # Najbezpieczniej: 0 -> przejście, !=0 -> blokada
+                return val == 0 or val is True
+            return bool(val)
+
+        # 2) Siatka 2D
+        try:
+            if 0 <= y < len(passable) and 0 <= x < len(passable[0]):
+                cell = passable[y][x]
+            else:
+                return False
+        except Exception:
+            return False
+
+        if isinstance(cell, bool):
+            return cell
+        if isinstance(cell, (int, float)):
+            if self._pass_mode_2d is None:
+                self._infer_pass_mode_2d(passable)
+            if self._pass_mode_2d == 'zero_is_free':
+                return cell == 0
+            if self._pass_mode_2d == 'nonzero_is_free':
+                return cell != 0
+            # fallback: przyjmij, że 0 = wolne
+            return cell == 0
+
+        # Inne typy: traktuj truthy jako przejście
+        return bool(cell)
+
+    def _begin_step(self, dx: int, dy: int):
+        # Rozpocznij ruch do kolejnej kratki
+        self.grid_x += dx
+        self.grid_y += dy
+        self.target_x = self.grid_x * settings.TILE_SIZE
+        self.target_y = self.grid_y * settings.TILE_SIZE
+        self.moving = True
+        # reset anty-spamu blokady — cel zmieni się po ruchu
+        self._last_blocked = None
+
     def update(self, dt, map_rows, passable, names):
         # 1) Jeśli nie poruszamy się: spróbuj zacząć krok zgodnie z trzymanym klawiszem
         if not self.moving:
@@ -203,10 +263,10 @@ class Player:
             if dx != 0 or dy != 0:
                 nx = self.grid_x + dx
                 ny = self.grid_y + dy
-                if _is_passable(nx, ny, passable):
+                if self._is_passable(nx, ny, map_rows, passable):
                     self._begin_step(dx, dy)
                 else:
-                    # Kolizja — nie zmieniamy pozycji; informujemy TTS
+                    # Kolizja — nie zmieniamy pozycji; informujemy TTS (jednorazowo na kratkę)
                     self._speak_collision(map_rows, names, nx, ny)
 
         # 2) Interpolacja ruchu (płynne dojście do targetu)
@@ -228,7 +288,7 @@ class Player:
                 self.pixel_y = self.target_y
                 self.moving = False
                 self.frame = 0
-                # Po zakończeniu kroku — komunikat TTS (pozycja, kierunek, teren, co przed tobą)
+                # Po zakończeniu kroku — komunikat TTS
                 self._speak_after_arrival(map_rows, names)
 
             # Animacja chodzenia
@@ -240,10 +300,7 @@ class Player:
         # Pozycja do rysowania
         self.rect.topleft = (round(self.pixel_x), round(self.pixel_y))
 
+    # ---------- Render ----------
     def draw(self, surface):
         frame = self.frames[self.direction][self.frame]
         surface.blit(frame, (round(self.pixel_x), round(self.pixel_y)))
-
-    def repeat_last_message(self):
-        if self._last_tts:
-            tts.speak(self._last_tts)
