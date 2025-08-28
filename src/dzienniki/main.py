@@ -2,7 +2,6 @@
 
 import pygame
 from dzienniki import settings
-from dzienniki.utils.loader import load_image, load_sound
 from dzienniki.ui.screens import show_logo, show_title, main_menu, show_introduction
 from dzienniki.game import topdown_game_loop
 
