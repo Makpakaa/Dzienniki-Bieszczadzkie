@@ -1,6 +1,7 @@
 import pygame
 from dzienniki import settings
 from dzienniki.audio import tts
+from dzienniki.audio.tts_utils import speak_ui, speak_long, repeat_last
 from dzienniki.systems.maps import TileMap
 from dzienniki.entities.player import Player
 from dzienniki.systems import inventory
@@ -103,7 +104,7 @@ def topdown_game_loop(screen):
 
     # Jednorazowy sanity komunikat (tu minimalistyczny)
     try:
-        tts.speak(
+        speak_long(
             f"Start gry. Pozycja {player.grid_x} {player.grid_y}. "
             f"Stoisz na {names.get(map_rows[player.grid_y][player.grid_x], 'nieznanym terenie')}."
         )
@@ -126,7 +127,7 @@ def topdown_game_loop(screen):
                 if show_inventory:
                     if event.key in (pygame.K_ESCAPE, pygame.K_e):
                         show_inventory = False
-                        tts.speak("Zamknięto ekwipunek.")
+                        speak_ui("Zamknięto ekwipunek.")
                         continue
                     inventory.handle_inventory_navigation(event)
                     continue
@@ -135,10 +136,10 @@ def topdown_game_loop(screen):
                 if event.key == pygame.K_ESCAPE:
                     if show_inventory:
                         show_inventory = False
-                        tts.speak("Zamknięto ekwipunek.")
+                        speak_ui("Zamknięto ekwipunek.")
                     elif tracker_mode:
                         tracker_mode = False
-                        tts.speak("Zamknięto listę obiektów.")
+                        speak_ui("Zamknięto listę obiektów.")
                     else:
                         return
 
@@ -148,10 +149,10 @@ def topdown_game_loop(screen):
                     if show_inventory:
                         inventory.selected_section = 1
                         inventory.selected_item_index = 0
-                        tts.speak("Ekwipunek otwarty.")
+                        speak_ui("Ekwipunek otwarty.")
                         inventory.speak_current_item()
                     else:
-                        tts.speak("Zamknięto ekwipunek.")
+                        speak_ui("Zamknięto ekwipunek.")
 
                 # R - powtórz ostatni komunikat (tracker albo gracz)
                 elif event.key == pygame.K_r:
@@ -161,7 +162,7 @@ def topdown_game_loop(screen):
                         if hasattr(player, "repeat_last_message"):
                             player.repeat_last_message()
                         else:
-                            tts.speak("Brak komunikatu do powtórzenia.")
+                            speak_ui("Brak komunikatu do powtórzenia.")
 
                 # T - tryb object tracker
                 elif event.key == pygame.K_t:
@@ -202,7 +203,7 @@ def topdown_game_loop(screen):
                                 except Exception:
                                     tracker.activate_selection()
                             else:
-                                tts.speak("Brak obiektów.")
+                                speak_ui("Brak obiektów.")
                         # Prawa lista: Zapisane punkty
                         else:
                             if tracker.selected_index == 0:
@@ -215,7 +216,7 @@ def topdown_game_loop(screen):
                                     if hasattr(tracker, "flag_label"):
                                         tracker.flag_label = sp.get("name")
                                 else:
-                                    tts.speak("Błędny wybór zapisanego punktu.")
+                                    speak_ui("Błędny wybór zapisanego punktu.")
 
                 # Spacja - submenu (tylko w trackerze)
                 elif event.key == pygame.K_SPACE and tracker_mode:

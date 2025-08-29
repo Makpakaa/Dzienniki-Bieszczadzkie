@@ -1,5 +1,6 @@
 import pygame
 from dzienniki.audio import tts
+from dzienniki.audio.tts_utils import speak_ui  # krótkie, przerywane komunikaty UI
 from dzienniki.systems.item import Item
 
 FONT_SIZE = 24
@@ -79,15 +80,15 @@ def get_section_items(section_idx):
 def speak_current_item():
     items = get_section_items(selected_section)
     if not items:
-        tts.speak("Brak elementów.")
+        speak_ui("Brak elementów.")
         return
     if selected_item_index < 0 or selected_item_index >= len(items):
-        tts.speak("Poza zakresem listy.")
+        speak_ui("Poza zakresem listy.")
         return
     current = selected_item_index + 1
     total = len(items)
     text = items[selected_item_index]
-    tts.speak(f"{text}. Pozycja {current} z {total}.")
+    speak_ui(f"{text}. Pozycja {current} z {total}.")
 
 def get_selected_item():
     if selected_section == 0:
@@ -137,9 +138,9 @@ def build_sub_menu_options(item, section_idx):
 
 def speak_current_submenu():
     if sub_menu_options:
-        tts.speak(sub_menu_options[selected_sub_menu_option])
+        speak_ui(sub_menu_options[selected_sub_menu_option])
     else:
-        tts.speak("Brak opcji.")
+        speak_ui("Brak opcji.")
 
 def handle_inventory_navigation(event):
     global selected_section, selected_item_index
@@ -157,18 +158,18 @@ def handle_inventory_navigation(event):
             inventory_mode = "browse"
             moving_item = None
             moving_item_source = None
-            tts.speak("Anulowano przenoszenie.")
+            speak_ui("Anulowano przenoszenie.")
             return
         if key == pygame.K_TAB and not pygame.key.get_mods() & pygame.KMOD_SHIFT:
             selected_section = (selected_section + 1) % len(SECTIONS)
             selected_item_index = 0
-            tts.speak(SECTIONS[selected_section])
+            speak_ui(SECTIONS[selected_section])
             speak_current_item()
             return
         if key == pygame.K_TAB and pygame.key.get_mods() & pygame.KMOD_SHIFT:
             selected_section = (selected_section - 1) % len(SECTIONS)
             selected_item_index = 0
-            tts.speak(SECTIONS[selected_section])
+            speak_ui(SECTIONS[selected_section])
             speak_current_item()
             return
         if key in (pygame.K_UP, pygame.K_DOWN):
@@ -188,7 +189,7 @@ def handle_inventory_navigation(event):
     if inventory_mode == "browse" and key == pygame.K_r:
         sort_mode = (sort_mode + 1) % 4
         modes = ["A do Z", "Z do A", "ilościowo malejąco", "ilościowo rosnąco"]
-        tts.speak(f"Sortowanie: {modes[sort_mode]}")
+        speak_ui(f"Sortowanie: {modes[sort_mode]}")
         return
 
     # Nawigacja w browse
@@ -196,13 +197,13 @@ def handle_inventory_navigation(event):
         if key == pygame.K_TAB and not pygame.key.get_mods() & pygame.KMOD_SHIFT:
             selected_section = (selected_section + 1) % len(SECTIONS)
             selected_item_index = 0
-            tts.speak(SECTIONS[selected_section])
+            speak_ui(SECTIONS[selected_section])
             speak_current_item()
             return
         if key == pygame.K_TAB and pygame.key.get_mods() & pygame.KMOD_SHIFT:
             selected_section = (selected_section - 1) % len(SECTIONS)
             selected_item_index = 0
-            tts.speak(SECTIONS[selected_section])
+            speak_ui(SECTIONS[selected_section])
             speak_current_item()
             return
         if key == pygame.K_UP:
@@ -220,7 +221,7 @@ def handle_inventory_navigation(event):
         if key == pygame.K_SPACE:
             item = get_selected_item()
             if not item:
-                tts.speak("Brak przedmiotu.")
+                speak_ui("Brak przedmiotu.")
                 return
             sub_menu_options.clear()
             sub_menu_options.extend(build_sub_menu_options(item, selected_section))
@@ -230,7 +231,7 @@ def handle_inventory_navigation(event):
                 selected_sub_menu_option = 0
                 speak_current_submenu()
             else:
-                tts.speak("Brak dostępnych opcji.")
+                speak_ui("Brak dostępnych opcji.")
         return
 
     # Nawigacja w submenu
@@ -249,7 +250,7 @@ def handle_inventory_navigation(event):
         if key == pygame.K_ESCAPE:
             inventory_mode = "browse"
             sub_menu_open = False
-            tts.speak("Anulowano.")
+            speak_ui("Anulowano.")
         return
 
 def execute_submenu_action():
@@ -257,7 +258,7 @@ def execute_submenu_action():
 
     item = get_selected_item()
     if not item:
-        tts.speak("Brak przedmiotu.")
+        speak_ui("Brak przedmiotu.")
         return
 
     option = sub_menu_options[selected_sub_menu_option]
@@ -265,7 +266,7 @@ def execute_submenu_action():
     if option == "Załóż":
         slot = item.slot
         if equipment_slots.get(slot):
-            tts.speak(f"Slot {slot} jest już zajęty.")
+            speak_ui(f"Slot {slot} jest już zajęty.")
         else:
             equipment_slots[slot] = item
             item.equipped = True
@@ -274,7 +275,7 @@ def execute_submenu_action():
             for i in range(len(quick_access_items)):
                 if quick_access_items[i] == item:
                     quick_access_items[i] = None
-            tts.speak(f"Założono: {item.name}")
+            speak_ui(f"Założono: {item.name}")
         inventory_mode = "browse"
         sub_menu_open = False
 
@@ -284,14 +285,14 @@ def execute_submenu_action():
         if equipment_slots[slot]:
             backpack_items.append(equipment_slots[slot])
             equipment_slots[slot] = None
-            tts.speak("Zdjęto przedmiot.")
+            speak_ui("Zdjęto przedmiot.")
         else:
-            tts.speak("Slot był pusty.")
+            speak_ui("Slot był pusty.")
         inventory_mode = "browse"
         sub_menu_open = False
 
     elif option == "Użyj":
-        tts.speak(f"Użyto: {item.name}")
+        speak_ui(f"Użyto: {item.name}")
         inventory_mode = "browse"
         sub_menu_open = False
 
@@ -300,15 +301,15 @@ def execute_submenu_action():
         moving_item_source = (selected_section, selected_item_index)
         inventory_mode = "moving"
         sub_menu_open = False
-        tts.speak(f"Przenoszenie: {item.name}. Wybierz miejsce docelowe i naciśnij Enter.")
+        speak_ui(f"Przenoszenie: {item.name}. Wybierz miejsce docelowe i naciśnij Enter.")
 
     elif option == "Upuść":
-        tts.speak(f"Upuszczono: {item.name}")
+        speak_ui(f"Upuszczono: {item.name}")
         inventory_mode = "browse"
         sub_menu_open = False
 
     elif option == "Właściwości":
-        tts.speak(f"Przedmiot: {item.name}, ilość: {item.count}")
+        speak_ui(f"Przedmiot: {item.name}, ilość: {item.count}")
         inventory_mode = "browse"
         sub_menu_open = False
 
@@ -316,32 +317,32 @@ def confirm_move_target():
     global inventory_mode, moving_item, moving_item_source
 
     if not moving_item or not moving_item_source:
-        tts.speak("Brak przedmiotu do przeniesienia.")
+        speak_ui("Brak przedmiotu do przeniesienia.")
         return
 
     if selected_section == 1:
         if len(backpack_items) >= BACKPACK_CAPACITY:
-            tts.speak("Brak miejsca w ekwipunku.")
+            speak_ui("Brak miejsca w ekwipunku.")
             return
         backpack_items.append(moving_item)
 
     elif selected_section == 2:
         if quick_access_items[selected_item_index] is not None:
-            tts.speak("Slot zajęty.")
+            speak_ui("Slot zajęty.")
             return
         quick_access_items[selected_item_index] = moving_item
 
     elif selected_section == 0:
         keys = list(equipment_slots.keys())
         if selected_item_index >= len(keys):
-            tts.speak("Nieprawidłowy slot.")
+            speak_ui("Nieprawidłowy slot.")
             return
         slot = keys[selected_item_index]
         if equipment_slots[slot] is not None:
-            tts.speak("Slot zajęty.")
+            speak_ui("Slot zajęty.")
             return
         if not moving_item.can_equip() or moving_item.slot != slot:
-            tts.speak("Nie pasuje do slotu.")
+            speak_ui("Nie pasuje do slotu.")
             return
         equipment_slots[slot] = moving_item
         moving_item.equipped = True
@@ -356,7 +357,7 @@ def confirm_move_target():
         keys = list(equipment_slots.keys())
         equipment_slots[keys[src_index]] = None
 
-    tts.speak(f"Przeniesiono {moving_item.name}.")
+    speak_ui(f"Przeniesiono {moving_item.name}.")
     moving_item = None
     moving_item_source = None
     inventory_mode = "browse"

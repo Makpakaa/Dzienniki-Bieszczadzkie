@@ -3,25 +3,18 @@
 # Uwaga: brak logiki kamery i rozgrywki – to jest wyłącznie warstwa ekranów.
 
 import pygame
-from dzienniki.audio.tts import manager
+from dzienniki.audio.tts_utils import speak_ui, speak_long  # UI (przerywane) + narracja (bez przerywania)
 from dzienniki import settings
 
 
 # ---------- Narzędzia TTS ----------
 
 def speak_now(text: str):
-    """Natychmiast przerwij bieżącą kwestię i wypowiedz nowy tekst."""
+    """Natychmiast przerwij bieżącą kwestię i wypowiedz nowy tekst (klikowe)."""
     try:
-        manager.engine.stop()
-        manager.engine.say(text)
-        manager.engine.runAndWait()
+        speak_ui(text)
     except Exception:
-        # awaryjnie: bez wyciszenia – minimalny fallback
-        try:
-            manager.engine.say(text)
-            manager.engine.runAndWait()
-        except Exception:
-            pass
+        pass
 
 
 # ---------- Narzędzia rysowania ----------
@@ -83,7 +76,7 @@ def main_menu(screen):
     options = ["Nowa Gra", "Załaduj Grę", "Wyjście"]
     selected = 0
     clock = pygame.time.Clock()
-    # Powiedz instrukcję + pierwszy element
+    # Powiedz instrukcję + pierwszy element (klikowe, przerywane)
     speak_now("Menu główne. Strzałki góra, dół. Enter zatwierdza. Escape wychodzi.")
     speak_now(options[selected])
 
@@ -128,6 +121,7 @@ def main_menu(screen):
 def show_introduction(screen):
     """
     Ekran wprowadzenia. Dowolny klawisz / klik wyjdzie.
+    Narracja leci w tle (bez przerywania), ale krótka podpowiedź jest przerywana.
     """
     lines = [
         "Witamy w Dziennikach Bieszczadzkich!",
@@ -139,7 +133,15 @@ def show_introduction(screen):
     _draw_centered_lines(screen, lines, font_size=36, line_spacing=8, y_offset=-40)
     pygame.display.flip()
 
-    speak_now(" ".join(lines) + " Naciśnij dowolny klawisz, aby kontynuować.")
+    # Dłuższa narracja – nie przerywamy
+    try:
+        speak_long(" ".join(lines))
+    except Exception:
+        pass
+
+    # Krótka, „klikowa” podpowiedź – przerywalna
+    speak_now("Naciśnij dowolny klawisz, aby kontynuować.")
+
     clock = pygame.time.Clock()
     while True:
         for e in pygame.event.get():

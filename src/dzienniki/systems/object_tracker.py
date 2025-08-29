@@ -1,5 +1,6 @@
 import pygame
 from dzienniki.audio import tts
+from dzienniki.audio.tts_utils import speak_ui  # <= krótkie komunikaty z natychmiastowym przerwaniem
 import os
 import json
 from dzienniki.utils.scan_filters import load_scan_filters, should_ignore
@@ -206,12 +207,13 @@ class ObjectTracker:
 
     # ---------- TTS ----------
     def _speak(self, msg: str):
+        # krótkie, przerywane komunikaty (focus, wybory, listy, flaga)
         self._last_tts = msg or ""
-        tts.speak(msg)
+        speak_ui(msg)
 
     def repeat_last_message(self):
         if self._last_tts:
-            tts.speak(self._last_tts)
+            speak_ui(self._last_tts)
 
     def speak_selected(self):
         self._announce_focus()
