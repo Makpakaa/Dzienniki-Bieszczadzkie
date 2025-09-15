@@ -17,7 +17,47 @@ def speak_now(text: str):
         pass
 
 
-# ---------- Narzędzia rysowania ----------
+def kill_tts_now():
+    """
+    Twarde zatrzymanie mowy:
+    1) jeśli istnieje dzienniki.audio.tts.manager.engine.stop() — użyj,
+    2) jeśli tts_utils ma stop_all() — użyj,
+    3) w ostateczności wstrzyknij pusty komunikat (przerywany kanał).
+    """
+    # 1) centralny manager (pyttsx3)
+    try:
+        from dzienniki.audio import tts as _tts  # type: ignore
+        eng = getattr(getattr(_tts, "manager", None), "engine", None)
+        if eng is not None:
+            try:
+                eng.stop()  # natychmiast ucina kolejkę
+                return
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # 2) tts_utils.stop_all() jeśli istnieje
+    try:
+        from dzienniki.audio import tts_utils as _tu  # type: ignore
+        stop_fn = getattr(_tu, "stop_all", None) or getattr(_tu, "stop", None)
+        if callable(stop_fn):
+            try:
+                stop_fn()
+                return
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # 3) miękki fallback — przerwij kanał klikowy
+    try:
+        speak_ui("")
+    except Exception:
+        pass
+
+
+# ---------- Narzędzia rysowania i wejścia ----------
 
 def _draw_centered_lines(screen, lines, font_size=48, color=(255, 255, 0), line_spacing=12, y_offset=0):
     """Wyrenderuj listę linii wyśrodkowanych na ekranie."""
@@ -45,6 +85,24 @@ def _wait_or_skip(seconds: float) -> bool:
         clock.tick(settings.FPS)
         elapsed += 1.0 / settings.FPS
     return False
+
+
+def _flush_inputs_and_wait_release():
+    """
+    Czyści kolejkę zdarzeń i czeka, aż WSZYSTKIE klawisze będą puszczone.
+    Zabezpiecza przed „przeciekaniem” Entera z poprzedniego ekranu.
+    """
+    try:
+        pygame.event.clear()
+    except Exception:
+        pass
+    clock = pygame.time.Clock()
+    while True:
+        pygame.event.pump()
+        pressed = pygame.key.get_pressed()
+        if not any(pressed):
+            break
+        clock.tick(120)
 
 
 # ---------- Ekrany ----------
@@ -95,10 +153,11 @@ def main_menu(screen):
                     selected = (selected + 1) % len(options)
                     speak_now(options[selected])
                 elif e.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                    choice = options[selected].lower().replace(" ", "_")
                     speak_now(f"Wybrano: {options[selected]}")
-                    # krótka pauza by nie uciąć TTS
-                    pygame.time.wait(200)
-                    return options[selected].lower().replace(" ", "_")
+                    pygame.time.wait(200)  # krótka pauza by nie uciąć TTS
+                    _flush_inputs_and_wait_release()  # ważne
+                    return choice
 
         screen.fill((0, 0, 0))
         # rysowanie opcji
@@ -121,8 +180,12 @@ def main_menu(screen):
 def show_introduction(screen):
     """
     Ekran wprowadzenia. Dowolny klawisz / klik wyjdzie.
-    Narracja leci w tle (bez przerywania), ale krótka podpowiedź jest przerywana.
+    Narracja leci w tle (bez przerywania), a komunikat „Naciśnij dowolny klawisz…”
+    jest dołączony do tej samej kolejki, więc poleci po narracji.
+    Po wyjściu — twardo uciszamy TTS, by nie ciągnął się na ekran gry.
     """
+    _flush_inputs_and_wait_release()  # zabezpieczenie po wejściu z menu
+
     lines = [
         "Witamy w Dziennikach Bieszczadzkich!",
         "Jesteś wędrowcem przemierzającym wzgórza i doliny.",
@@ -133,18 +196,21 @@ def show_introduction(screen):
     _draw_centered_lines(screen, lines, font_size=36, line_spacing=8, y_offset=-40)
     pygame.display.flip()
 
-    # Dłuższa narracja – nie przerywamy
+    # Dłuższa narracja – kolejkujemy
     try:
         speak_long(" ".join(lines))
+        speak_long("Naciśnij dowolny klawisz, aby kontynuować.")
     except Exception:
-        pass
-
-    # Krótka, „klikowa” podpowiedź – przerywalna
-    speak_now("Naciśnij dowolny klawisz, aby kontynuować.")
+        speak_now("Naciśnij dowolny klawisz, aby kontynuować.")
 
     clock = pygame.time.Clock()
     while True:
         for e in pygame.event.get():
             if e.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN, pygame.QUIT):
+                # Twarde CIĘCIE mowy zanim wyjdziemy do gry:
+                kill_tts_now()
+                # króciutkie okno na zatrzymanie audio backendu
+                pygame.time.wait(80)
+                _flush_inputs_and_wait_release()
                 return
         clock.tick(settings.FPS)
