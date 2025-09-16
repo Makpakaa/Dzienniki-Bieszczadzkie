@@ -1,0 +1,13 @@
+{
+  "tileset_version": 1,
+  "tiles": {
+    ".": { "name": "trawa",   "collide": false, "sprite": "tiles/grass.png" },
+    ",": { "name": "sciezka", "collide": false, "sprite": "tiles/path.png"  },
+    "^": { "name": "skala",   "collide": true,  "sprite": "tiles/rock.png"  },
+    "~": { "name": "woda",    "collide": true,  "sprite": "tiles/water.png" },
+    "#": { "name": "mur",     "collide": true,  "sprite": "tiles/wall.png"  },
+    "D": { "name": "drzewo",  "collide": true,  "sprite": "tiles/tree.png"  },
+    "K": { "name": "krzak",   "collide": true,  "sprite": "tiles/bush.png"  },
+    "S": { "name": "spawn",   "collide": false, "sprite": "tiles/grass.png" }
+  }
+}
